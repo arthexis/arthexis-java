@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Column;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -15,8 +16,13 @@ public class ChargingStation {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Column(name = "station_id", length = 64, nullable = false, unique = true)
   private String stationId;
+
+  @Column(name = "status", length = 32, nullable = false)
   private String status;
+
+  @Column(name = "last_seen_at")
   private Instant lastSeenAt;
 
   protected ChargingStation() {}

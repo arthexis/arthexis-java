@@ -30,6 +30,19 @@ mvn spring-boot:run
 
 Use `SPRING_PROFILES_ACTIVE=h2` for local in-memory mode.
 
+If you want JWT/OAuth2 resource-server validation enabled, set:
+
+```bash
+SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8081/realms/arthexis
+```
+
+OpenTelemetry SDK autoconfiguration is disabled by default in this scaffold to keep local startup self-contained.
+Enable it when your telemetry stack is available:
+
+```bash
+OTEL_SDK_DISABLED=false
+```
+
 ## Next Steps for Arthexis Parity
 
 1. Replace baseline OCPP handler with a standards-compliant adapter (1.6/2.0.1/2.1).

@@ -21,11 +21,6 @@ spring:
   rabbitmq:
     host: localhost
     port: 5672
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8081/realms/arthexis
 
 management:
   endpoints:
@@ -44,3 +39,7 @@ arthexis:
 logging:
   pattern:
     level: "%5p [trace_id=%X{trace_id:-} span_id=%X{span_id:-}]"
+
+otel:
+  sdk:
+    disabled: true
