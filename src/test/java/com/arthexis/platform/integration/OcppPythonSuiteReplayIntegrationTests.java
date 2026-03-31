@@ -7,6 +7,7 @@ import com.arthexis.platform.charging.ChargingConnectorStateService;
 import com.arthexis.platform.charging.ChargingStation;
 import com.arthexis.platform.charging.ChargingStationRepository;
 import com.arthexis.platform.charging.ChargingStationService;
+import com.arthexis.platform.auth.AuthorizationDecision;
 import com.arthexis.platform.ocpp.OcaOcppBridgeService;
 import com.arthexis.platform.ocpp.OcaOcppPayloadNormalizer;
 import com.arthexis.platform.ocpp.OcppMessage;
@@ -74,7 +75,9 @@ class OcppPythonSuiteReplayIntegrationTests {
               public void storePendingCommand(String stationId, String commandId, String action) {}
             },
             new TelemetryIngestionService(telemetrySampleRepository, noOpEvents),
-            new OcaOcppPayloadNormalizer());
+            new OcaOcppPayloadNormalizer(),
+            (stationId, cardUid) ->
+                new AuthorizationDecision(true, "Accepted", "DIRECT", null, null, "rfid_optional_disabled"));
 
     OcppSessionAuditService sessionAuditService =
         new OcppSessionAuditService(

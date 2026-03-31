@@ -20,6 +20,7 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - `com.arthexis.platform.charging` – charging station domain model
 - `com.arthexis.platform.operations` – async/scheduled orchestration
 - `com.arthexis.platform.telemetry` – telemetry ingestion and persistence primitives
+- `com.arthexis.platform.auth` – RFID authorization, account login flows, and charge-point QR login sessions
 - `com.arthexis.platform.security` – API security policy
 - `com.arthexis.platform.simulator` – OCPP charge-point simulator for local CSMS flows
 

@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.arthexis.platform.auth.AuthorizationDecision;
+import com.arthexis.platform.auth.RfidAuthorizationGateway;
 import com.arthexis.platform.charging.ChargingConnectorState;
 import com.arthexis.platform.charging.ChargingConnectorStateRepository;
 import com.arthexis.platform.charging.ChargingConnectorStateService;
@@ -32,6 +34,7 @@ class OcaOcppBridgeStatusNotificationTests {
   @Mock private ChargingConnectorStateRepository connectorStateRepository;
   @Mock private TelemetrySampleRepository telemetrySampleRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private RfidAuthorizationGateway rfidAuthorizationGateway;
 
   private OcaOcppBridgeService bridgeService;
 
@@ -43,7 +46,8 @@ class OcaOcppBridgeStatusNotificationTests {
             new ChargingConnectorStateService(connectorStateRepository),
             new OcppSessionStateStore(new StringRedisTemplate()),
             new TelemetryIngestionService(telemetrySampleRepository, eventPublisher),
-            new OcaOcppPayloadNormalizer());
+            new OcaOcppPayloadNormalizer(),
+            rfidAuthorizationGateway);
   }
 
   @Test
@@ -179,5 +183,43 @@ class OcaOcppBridgeStatusNotificationTests {
     assertThat(connectorCaptor.getValue().getStationId()).isEqualTo("CP-2X");
     assertThat(connectorCaptor.getValue().getEvseId()).isEqualTo(4);
     assertThat(connectorCaptor.getValue().getConnectorId()).isEqualTo(7);
+  }
+
+  @Test
+  void returnsSpecCompliantAuthorizeResponseForOcpp16() {
+    when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+        .thenReturn(
+            new AuthorizationDecision(
+                false,
+                "Blocked",
+                "ACCOUNT_LOGIN",
+                "acct-16",
+                "https://example/login",
+                "user_login_required"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-16", new OcppMessage("2", "msg-auth-16", "Authorize", Map.of("idTag", "CARD-16", "stationId", "CP-16")));
+
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Blocked")));
+  }
+
+  @Test
+  void handlesMalformedOcpp2xAuthorizeWithoutThrowing() {
+    when(rfidAuthorizationGateway.authorize(any(), any()))
+        .thenReturn(
+            new AuthorizationDecision(false, "Invalid", "ACCOUNT_LOGIN", null, null, "rfid_card_unknown"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-2x",
+            new OcppMessage(
+                "2",
+                "msg-auth-2x",
+                "Authorize",
+                Map.of("chargingStation", Map.of("serialNumber", "CP-2X"), "idToken", Map.of())));
+
+    assertThat(response.payload()).containsKey("idTokenInfo");
+    assertThat(response.payload()).containsKey("customData");
   }
 }

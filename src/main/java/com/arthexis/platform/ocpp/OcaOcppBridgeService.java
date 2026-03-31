@@ -1,5 +1,7 @@
 package com.arthexis.platform.ocpp;
 
+import com.arthexis.platform.auth.AuthorizationDecision;
+import com.arthexis.platform.auth.RfidAuthorizationGateway;
 import com.arthexis.platform.charging.ChargingConnectorStateService;
 import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationService;
@@ -16,18 +18,22 @@ public class OcaOcppBridgeService {
   private final OcppSessionStateStore stateStore;
   private final TelemetryIngestionService telemetryIngestionService;
   private final OcaOcppPayloadNormalizer payloadNormalizer;
+  private final RfidAuthorizationGateway rfidAuthorizationService;
+
 
   public OcaOcppBridgeService(
       ChargingStationService chargingStationService,
       ChargingConnectorStateService connectorStateService,
       OcppSessionStateStore stateStore,
       TelemetryIngestionService telemetryIngestionService,
-      OcaOcppPayloadNormalizer payloadNormalizer) {
+      OcaOcppPayloadNormalizer payloadNormalizer,
+      RfidAuthorizationGateway rfidAuthorizationService) {
     this.chargingStationService = chargingStationService;
     this.connectorStateService = connectorStateService;
     this.stateStore = stateStore;
     this.telemetryIngestionService = telemetryIngestionService;
     this.payloadNormalizer = payloadNormalizer;
+    this.rfidAuthorizationService = rfidAuthorizationService;
   }
 
   public OcppBridgeResponse handleIncoming(String sessionId, OcppMessage incoming) {
@@ -75,6 +81,11 @@ public class OcaOcppBridgeService {
         telemetryIngestionService.ingestMeterValues(
             stationId, payloadNormalizer.normalizeMeterValues(stationId, payload));
         yield response(stationId, accepted());
+      }
+      case "Authorize" -> {
+        String cardUid = resolveCardUid(payload);
+        AuthorizationDecision decision = rfidAuthorizationService.authorize(stationId, cardUid);
+        yield response(stationId, authorizePayload(decision, payload));
       }
       case "TransactionEvent" -> {
         telemetryIngestionService.ingestMeterValues(
@@ -192,6 +203,48 @@ public class OcaOcppBridgeService {
         null,
         Instant.now(),
         includeBootTime ? Instant.now() : null);
+  }
+
+  private Map<String, Object> authorizePayload(AuthorizationDecision decision, Map<String, Object> payload) {
+    String cardUid = resolveCardUid(payload);
+    if (payload.containsKey("idToken")) {
+      Map<String, Object> idTokenInfo =
+          Map.of(
+              "status", decision.ocppStatus(),
+              "customData", Map.of("authMode", decision.authMode(), "reason", decision.reason()));
+
+      return decision.loginUrl() == null
+          ? Map.of(
+              "idTokenInfo",
+              idTokenInfo,
+              "customData",
+              Map.of(
+                  "accountExternalId", nullable(decision.accountExternalId()),
+                  "cardUid", nullable(cardUid)))
+          : Map.of(
+              "idTokenInfo",
+              idTokenInfo,
+              "customData",
+                  Map.of(
+                      "accountExternalId", nullable(decision.accountExternalId()),
+                      "cardUid", nullable(cardUid),
+                      "loginUrl", decision.loginUrl()));
+    }
+
+    return Map.of("idTagInfo", Map.of("status", decision.ocppStatus()));
+  }
+
+  private String nullable(String value) {
+    return value == null ? "" : value;
+  }
+
+  private String resolveCardUid(Map<String, Object> payload) {
+    String idTag = stringValue(payload.get("idTag"));
+    if (!idTag.isBlank()) {
+      return idTag;
+    }
+    Map<String, Object> idToken = mapValue(payload.get("idToken"));
+    return firstNonBlank(stringValue(idToken.get("idToken")), stringValue(payload.get("token")), "");
   }
 
   private Map<String, Object> mapValue(Object value) {
