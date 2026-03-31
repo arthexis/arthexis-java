@@ -129,6 +129,15 @@ public class OcaOcppPayloadNormalizer {
     if (!connectorId.isBlank()) {
       normalized.put("connectorId", connectorId);
     }
+
+    String timestamp =
+        firstNonBlank(
+            stringValue(payload.get("timestamp")),
+            stringValue(payload.get("timeStamp")),
+            stringValue(payload.get("eventTimestamp")));
+    if (!timestamp.isBlank()) {
+      normalized.put("timestamp", timestamp);
+    }
     return normalized;
   }
 

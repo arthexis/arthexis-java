@@ -113,6 +113,34 @@ class OcppCommandDispatchServiceTests {
   }
 
   @Test
+  void keepsDefaultProfilesWhenCustomCapabilitiesAreConfigured() {
+    OcppCommandDispatchProperties properties = new OcppCommandDispatchProperties();
+    properties.setAckTimeout(Duration.ofSeconds(45));
+    properties.setRetryDelay(Duration.ofSeconds(1));
+    properties.setMaxRetries(1);
+    properties.setProfileCapabilities(Map.of("new-profile", Set.of("TriggerMessage")));
+
+    OcppCommandDispatchService profileAwareService =
+        new OcppCommandDispatchService(
+            commandRepository,
+            sessionRouter,
+            stateStore,
+            properties,
+            new ObjectMapper(),
+            eventPublisher);
+
+    AdminCommandRequest defaultProfileRequest =
+        new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = profileAwareService.submit(defaultProfileRequest, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
+  }
+
+  @Test
   void marksCommandAcknowledgedByMessageId() {
     OcppCommandRecord command =
         new OcppCommandRecord("CP-16", "EVSE", "Reset", "{}", "admin", 3);

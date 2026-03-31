@@ -71,17 +71,18 @@ public class OcppCommandDispatchProperties {
   }
 
   private Map<String, Set<String>> normalize(Map<String, Set<String>> source) {
+    Map<String, Set<String>> normalized = new LinkedHashMap<>(defaultProfileCapabilities());
     if (source == null || source.isEmpty()) {
-      return defaultProfileCapabilities();
+      return normalized;
     }
-    Map<String, Set<String>> normalized = new LinkedHashMap<>();
+
     source.forEach(
         (profile, actions) -> {
           if (profile != null && !profile.isBlank()) {
             normalized.put(profile.trim().toLowerCase(), orderedSet(actions));
           }
         });
-    return normalized.isEmpty() ? defaultProfileCapabilities() : normalized;
+    return normalized;
   }
 
   private Set<String> orderedSet(String... values) {

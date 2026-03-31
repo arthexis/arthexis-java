@@ -89,31 +89,19 @@ public class OcaOcppBridgeService {
         yield response(stationId, accepted());
       }
       case "Authorize" -> {
-        payloadNormalizer.normalizeAuthorize(stationId, payload);
-        yield response(stationId, Map.of("idTagInfo", Map.of("status", "Accepted")));
+        Map<String, Object> normalized = payloadNormalizer.normalizeAuthorize(stationId, payload);
+        String authorizationStatus =
+            normalized.containsKey("idTag") || normalized.containsKey("idToken")
+                ? "Accepted"
+                : "Invalid";
+        yield response(stationId, Map.of("idTagInfo", Map.of("status", authorizationStatus)));
       }
       case "DiagnosticsStatusNotification" -> {
-        Map<String, Object> normalized = payloadNormalizer.normalizeDiagnosticsStatus(stationId, payload);
-        Map<String, Object> adminPayload = Map.of();
-        if (normalized.containsKey("status")) {
-          adminPayload = Map.of("diagnosticsStatus", normalized.get("status"));
-        }
-        chargingStationService.upsertStatus(
-            stationId,
-            "ONLINE",
-            buildAdminDetails(adminPayload, false));
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, accepted());
       }
       case "FirmwareStatusNotification" -> {
-        Map<String, Object> normalized = payloadNormalizer.normalizeFirmwareStatus(stationId, payload);
-        Map<String, Object> adminPayload = Map.of();
-        if (normalized.containsKey("status")) {
-          adminPayload = Map.of("firmwareVersion", normalized.get("status"));
-        }
-        chargingStationService.upsertStatus(
-            stationId,
-            "ONLINE",
-            buildAdminDetails(adminPayload, false));
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, accepted());
       }
       case "AvailabilityStatusNotification" -> {
@@ -128,7 +116,7 @@ public class OcaOcppBridgeService {
             availabilityStatus,
             "",
             availabilityStatus,
-            Instant.now());
+            resolveEventTimestamp(normalized));
         yield response(stationId, accepted());
       }
       default -> response(stationId, accepted());
@@ -252,6 +240,18 @@ public class OcaOcppBridgeService {
       return Integer.parseInt(value.toString());
     } catch (NumberFormatException ex) {
       return defaultValue;
+    }
+  }
+
+  private Instant resolveEventTimestamp(Map<String, Object> normalized) {
+    String timestamp = stringValue(normalized.get("timestamp"));
+    if (timestamp.isBlank()) {
+      return Instant.now();
+    }
+    try {
+      return Instant.parse(timestamp);
+    } catch (Exception ex) {
+      return Instant.now();
     }
   }
 
