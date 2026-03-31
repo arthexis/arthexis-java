@@ -72,8 +72,13 @@ public class ChargingConnectorStateService {
                         normalizedAvailability,
                         timestamp));
 
+    String mergedConnectorType =
+        normalizedConnectorType != null ? normalizedConnectorType : connectorState.getConnectorType();
+    String mergedAvailability =
+        normalizedAvailability != null ? normalizedAvailability : connectorState.getAvailability();
+
     connectorState.updateState(
-        normalizedStatus, normalizedConnectorType, normalizedAvailability, timestamp);
+        normalizedStatus, mergedConnectorType, mergedAvailability, timestamp);
     return repository.save(connectorState);
   }
 
