@@ -11,6 +11,13 @@ Install the following tools first:
 - **Maven 3.9+**
 - **Docker + Docker Compose plugin** (recommended for Postgres/Redis/RabbitMQ)
 
+### Windows setup notes
+
+- Install **Git for Windows** and use **PowerShell** or **Git Bash**.
+- Install **Temurin/OpenJDK 21** and verify with `java -version`.
+- Install **Maven 3.9+** and verify with `mvn -v`.
+- Install **Docker Desktop** and ensure Docker Compose v2 is available (`docker compose version`).
+
 ## 2) Clone the repository
 
 ```bash
@@ -44,16 +51,33 @@ The app starts with the default Spring profile and connects to the Docker-backed
 
 If you want to run without Postgres, enable the `h2` profile:
 
+### macOS/Linux
+
 ```bash
 SPRING_PROFILES_ACTIVE=h2 mvn spring-boot:run
+```
+
+### Windows PowerShell
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "h2"
+mvn spring-boot:run
 ```
 
 ## 6) Optional security configuration (JWT issuer)
 
 If you want OAuth2 resource-server validation enabled, set:
 
+### macOS/Linux
+
 ```bash
 export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8081/realms/arthexis
+```
+
+### Windows PowerShell
+
+```powershell
+$env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI = "http://localhost:8081/realms/arthexis"
 ```
 
 Then run the app as usual.
@@ -63,8 +87,16 @@ Then run the app as usual.
 OpenTelemetry SDK autoconfiguration is disabled by default for local convenience.
 Enable it when your telemetry backend is available:
 
+### macOS/Linux
+
 ```bash
 export OTEL_SDK_DISABLED=false
+```
+
+### Windows PowerShell
+
+```powershell
+$env:OTEL_SDK_DISABLED = "false"
 ```
 
 ## 8) Verify the install
