@@ -45,6 +45,10 @@ arthexis:
       charge-point-id: sim-cp-001
       heartbeat-interval: 60s
       reconnect-delay: 10s
+  rfid:
+    login-base-url: https://app.arthexis.local/energy/login
+    login-session-ttl: 10m
+    trusted-login-window: 15m
 
 logging:
   pattern:

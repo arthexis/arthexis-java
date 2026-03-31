@@ -2,6 +2,7 @@ package com.arthexis.platform.charging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.arthexis.platform.auth.AuthorizationDecision;
 import com.arthexis.platform.ocpp.OcaOcppBridgeService;
 import com.arthexis.platform.ocpp.OcaOcppPayloadNormalizer;
 import com.arthexis.platform.ocpp.OcppBridgeResponse;
@@ -38,7 +39,9 @@ class ChargingStatusReplayIntegrationTests {
               public void storePendingCommand(String stationId, String commandId, String action) {}
             },
             new TelemetryIngestionService(telemetrySampleRepository, noOpEvents),
-            new OcaOcppPayloadNormalizer());
+            new OcaOcppPayloadNormalizer(),
+            (stationId, cardUid) ->
+                new AuthorizationDecision(true, "Accepted", "DIRECT", null, null, "rfid_optional_disabled"));
   }
 
   @Test

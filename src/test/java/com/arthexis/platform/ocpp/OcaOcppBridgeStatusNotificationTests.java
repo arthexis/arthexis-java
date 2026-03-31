@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.arthexis.platform.auth.AuthorizationDecision;
 import com.arthexis.platform.charging.ChargingConnectorState;
 import com.arthexis.platform.charging.ChargingConnectorStateRepository;
 import com.arthexis.platform.charging.ChargingConnectorStateService;
@@ -43,7 +44,9 @@ class OcaOcppBridgeStatusNotificationTests {
             new ChargingConnectorStateService(connectorStateRepository),
             new OcppSessionStateStore(new StringRedisTemplate()),
             new TelemetryIngestionService(telemetrySampleRepository, eventPublisher),
-            new OcaOcppPayloadNormalizer());
+            new OcaOcppPayloadNormalizer(),
+            (stationId, cardUid) ->
+                new AuthorizationDecision(true, "Accepted", "DIRECT", null, null, "rfid_optional_disabled"));
   }
 
   @Test
