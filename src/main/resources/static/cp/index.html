@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arthexis CP Charging Monitor</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #0b1220; color: #e7ecf3; }
+      .wrap { max-width: 980px; margin: 20px auto; padding: 0 16px; }
+      .card { background: #121b2e; border-radius: 12px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+      .row { display:flex; gap:12px; flex-wrap: wrap; margin-bottom: 12px; }
+      input, select, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #2b3e63; background: #0f1728; color: #e7ecf3; }
+      button { cursor: pointer; }
+      #status { color: #9fb3d2; margin-bottom: 8px; font-size: 14px; }
+      canvas { width: 100%; height: 380px; background: #0c1323; border-radius: 10px; }
+      .meta { margin-top: 8px; font-size: 13px; color: #9fb3d2; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>Arthexis CP Real-Time Charging Graph</h2>
+      <div class="card">
+        <div class="row">
+          <input id="stationId" placeholder="Station ID (e.g. sim-cp-001)" />
+          <select id="metricName"><option value="Power.Active.Import">Power.Active.Import</option></select>
+          <button id="loadBtn">Load</button>
+        </div>
+        <div id="status">Connect to a station to stream charging values in real time.</div>
+        <canvas id="chart" width="940" height="380"></canvas>
+        <div class="meta" id="meta"></div>
+      </div>
+    </div>
+
+    <script>
+      const points = [];
+      let source;
+      const maxPoints = 120;
+      const stationInput = document.getElementById('stationId');
+      const metricSelect = document.getElementById('metricName');
+      const statusEl = document.getElementById('status');
+      const metaEl = document.getElementById('meta');
+      const canvas = document.getElementById('chart');
+      const ctx = canvas.getContext('2d');
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0c1323';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (points.length < 2) {
+          ctx.fillStyle = '#8fa4c4';
+          ctx.fillText('Waiting for charging samples…', 20, 30);
+          return;
+        }
+
+        const values = points.map(p => p.metricValue);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const pad = (max - min || 1) * 0.15;
+        const low = min - pad;
+        const high = max + pad;
+
+        const left = 50, top = 20, right = canvas.width - 20, bottom = canvas.height - 40;
+        ctx.strokeStyle = '#31486f';
+        ctx.beginPath();
+        ctx.moveTo(left, top); ctx.lineTo(left, bottom); ctx.lineTo(right, bottom); ctx.stroke();
+
+        ctx.strokeStyle = '#46d3ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((p, i) => {
+          const x = left + (i / (points.length - 1)) * (right - left);
+          const y = bottom - ((p.metricValue - low) / (high - low)) * (bottom - top);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        const latest = points[points.length - 1];
+        metaEl.textContent = `Latest: ${latest.metricValue.toFixed(2)} ${latest.unit || ''} at ${new Date(latest.sampledAt).toLocaleTimeString()}`;
+      }
+
+      async function loadMetricOptions(stationId) {
+        const res = await fetch(`/cp/charging/metrics?stationId=${encodeURIComponent(stationId)}`);
+        if (!res.ok) return;
+        const metrics = await res.json();
+        if (!metrics.length) return;
+        metricSelect.innerHTML = '';
+        metrics.forEach(m => {
+          const option = document.createElement('option');
+          option.value = m;
+          option.textContent = m;
+          metricSelect.appendChild(option);
+        });
+      }
+
+      async function loadHistory() {
+        const stationId = stationInput.value.trim();
+        const metricName = metricSelect.value;
+        if (!stationId) return;
+
+        await loadMetricOptions(stationId);
+
+        const response = await fetch(`/cp/charging/history?stationId=${encodeURIComponent(stationId)}&metricName=${encodeURIComponent(metricName)}`);
+        const history = response.ok ? await response.json() : [];
+        points.splice(0, points.length, ...history.slice(-maxPoints));
+        draw();
+      }
+
+      function connectStream() {
+        if (source) source.close();
+        source = new EventSource('/cp/charging/stream');
+
+        source.onopen = () => statusEl.textContent = 'Live stream connected.';
+        source.onerror = () => statusEl.textContent = 'Live stream disconnected. Retrying…';
+
+        source.addEventListener('charging-sample', (event) => {
+          const stationId = stationInput.value.trim();
+          const metricName = metricSelect.value;
+          const sample = JSON.parse(event.data);
+          if (sample.stationId !== stationId || sample.metricName !== metricName) return;
+          points.push(sample);
+          if (points.length > maxPoints) points.shift();
+          draw();
+        });
+      }
+
+      document.getElementById('loadBtn').addEventListener('click', async () => {
+        await loadHistory();
+        connectStream();
+      });
+    </script>
+  </body>
+</html>
