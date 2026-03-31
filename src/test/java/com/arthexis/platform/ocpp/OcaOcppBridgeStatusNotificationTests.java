@@ -69,9 +69,9 @@ class OcaOcppBridgeStatusNotificationTests {
                 "connectorType", "CCS2",
                 "availability", "Operative"));
 
-    Map<String, Object> response = bridgeService.handleIncoming("session-1", incoming);
+    OcppBridgeResponse response = bridgeService.handleIncoming("session-1", incoming);
 
-    assertThat(response).containsEntry("status", "Accepted");
+    assertThat(response.payload()).containsEntry("status", "Accepted");
 
     ArgumentCaptor<ChargingStation> stationCaptor = ArgumentCaptor.forClass(ChargingStation.class);
     verify(chargingStationRepository).save(stationCaptor.capture());
