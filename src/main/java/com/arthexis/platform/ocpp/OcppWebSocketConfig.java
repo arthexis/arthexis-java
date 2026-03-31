@@ -17,6 +17,8 @@ public class OcppWebSocketConfig implements WebSocketConfigurer {
 
   @Override
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-    registry.addHandler(ocppWebSocketHandler, "/ws/ocpp").setAllowedOriginPatterns("*");
+    registry
+        .addHandler(ocppWebSocketHandler, "/ws/ocpp", "/ws/ocpp/{stationId}")
+        .setAllowedOriginPatterns("*");
   }
 }

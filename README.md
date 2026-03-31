@@ -50,3 +50,16 @@ OTEL_SDK_DISABLED=false
 2. Continue adding dedicated business modules (billing, users, connectors, firmware, etc).
 3. Add admin UI (Jmix/Vaadin) with module-scoped CRUD and command views.
 4. Add WebAuthn4J and TOTP providers to harden operator/admin authentication.
+
+## Charger Admin + CLI
+
+The scaffold now includes basic charger administration surfaces:
+
+- **Admin API** (`/api/admin/chargers`)
+  - `GET /api/admin/chargers` list stations
+  - `GET /api/admin/chargers/{stationId}` get one station
+  - `PUT /api/admin/chargers/{stationId}/status` with `{ "status": "ONLINE" }`
+- **CLI hooks** (run alongside the Spring app)
+  - `--charger-cli=list`
+  - `--charger-cli=get --station-id=CP-001`
+  - `--charger-cli=set-status --station-id=CP-001 --status=OFFLINE`
