@@ -1,4 +1,4 @@
-package com.arthexis.platform.app.cp;
+package com.arthexis.platform.telemetry;
 
 import java.time.Instant;
 

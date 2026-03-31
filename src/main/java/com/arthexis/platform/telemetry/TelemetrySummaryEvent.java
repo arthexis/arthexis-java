@@ -1,4 +1,4 @@
-package com.arthexis.platform.app.admin;
+package com.arthexis.platform.telemetry;
 
 import java.time.Instant;
 
@@ -8,5 +8,4 @@ public record TelemetrySummaryEvent(
     int structuredSamples,
     int numericPayloadSamples,
     Instant sampledAt,
-    Instant occurredAt)
-    implements AdminDomainEvent {}
+    Instant occurredAt) {}

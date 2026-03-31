@@ -107,8 +107,10 @@
       }
 
       function connectStream() {
+        const stationId = stationInput.value.trim();
+        if (!stationId) return;
         if (source) source.close();
-        source = new EventSource('/cp/charging/stream');
+        source = new EventSource(`/cp/charging/stream?stationId=${encodeURIComponent(stationId)}`);
 
         source.onopen = () => statusEl.textContent = 'Live stream connected.';
         source.onerror = () => statusEl.textContent = 'Live stream disconnected. Retrying…';

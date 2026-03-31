@@ -5,8 +5,7 @@ import java.time.Instant;
 public sealed interface AdminDomainEvent
     permits ConnectorChangedEvent,
         OcppMessagePersistedEvent,
-        StationStatusChangedEvent,
-        TelemetrySummaryEvent {
+        StationStatusChangedEvent {
 
   String stationId();
 

@@ -33,17 +33,28 @@ class CpChargingControllerTests {
   @Test
   void redirectsToCpChargingPage() throws Exception {
     mockMvc
-        .perform(get("/cp/charging").with(httpBasic("customer", "password")))
+        .perform(get("/cp/charging").with(httpBasic("sim-cp-001", "password")))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/cp/charging/index.html"));
+        .andExpect(redirectedUrl("/cp/index.html"));
   }
 
   @Test
   void returnsHistoryForCpCustomers() throws Exception {
-    when(telemetrySampleRepository.findTop120ByStationIdAndMetricNameOrderBySampledAtAsc(
+    when(telemetrySampleRepository.findTop120ByStationIdAndMetricNameOrderBySampledAtDesc(
             "sim-cp-001", "Power.Active.Import"))
         .thenReturn(
             List.of(
+                new TelemetrySample(
+                    "sim-cp-001",
+                    "Power.Active.Import",
+                    13.4,
+                    "connector",
+                    "evse-1:connector-1",
+                    "kW",
+                    null,
+                    null,
+                    null,
+                    Instant.parse("2026-03-31T00:01:00Z")),
                 new TelemetrySample(
                     "sim-cp-001",
                     "Power.Active.Import",
@@ -59,13 +70,25 @@ class CpChargingControllerTests {
     mockMvc
         .perform(
             get("/cp/charging/history")
-                .with(httpBasic("customer", "password"))
+                .with(httpBasic("sim-cp-001", "password"))
                 .queryParam("stationId", "sim-cp-001")
                 .queryParam("metricName", "Power.Active.Import"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].stationId").value("sim-cp-001"))
         .andExpect(jsonPath("$[0].metricName").value("Power.Active.Import"))
-        .andExpect(jsonPath("$[0].metricValue").value(12.4));
+        .andExpect(jsonPath("$[0].metricValue").value(12.4))
+        .andExpect(jsonPath("$[1].metricValue").value(13.4));
+  }
+
+  @Test
+  void forbidsCpCustomerFromAccessingDifferentStation() throws Exception {
+    mockMvc
+        .perform(
+            get("/cp/charging/history")
+                .with(httpBasic("sim-cp-001", "password"))
+                .queryParam("stationId", "sim-cp-002")
+                .queryParam("metricName", "Power.Active.Import"))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -81,7 +104,7 @@ class CpChargingControllerTests {
     @org.springframework.context.annotation.Bean
     InMemoryUserDetailsManager inMemoryUserDetailsManager() {
       return new InMemoryUserDetailsManager(
-          org.springframework.security.core.userdetails.User.withUsername("customer")
+          org.springframework.security.core.userdetails.User.withUsername("sim-cp-001")
               .password("password")
               .roles("CP_CUSTOMER")
               .build(),

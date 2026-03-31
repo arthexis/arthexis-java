@@ -12,7 +12,7 @@ import com.arthexis.platform.app.admin.AdminWebSocketDomainEventBridge;
 import com.arthexis.platform.app.admin.ConnectorChangedEvent;
 import com.arthexis.platform.app.admin.OcppMessagePersistedEvent;
 import com.arthexis.platform.app.admin.StationStatusChangedEvent;
-import com.arthexis.platform.app.admin.TelemetrySummaryEvent;
+import com.arthexis.platform.telemetry.TelemetrySummaryEvent;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;

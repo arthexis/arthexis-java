@@ -1,7 +1,5 @@
 package com.arthexis.platform.telemetry;
 
-import com.arthexis.platform.app.admin.TelemetrySummaryEvent;
-import com.arthexis.platform.app.cp.CpChargingSampleEvent;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -41,30 +39,28 @@ public class TelemetryIngestionService {
                   persisted.getSampledAt()));
         });
 
-    int numericPayloadSamples =
-        (int)
-            payload.entrySet().stream()
-                .filter(entry -> entry.getValue() instanceof Number)
-                .filter(entry -> !"stationId".equals(entry.getKey()))
-                .peek(
-                    entry ->
-                        {
-                          TelemetrySample persisted =
-                              repository.save(
-                                  new TelemetrySample(
-                                      stationId,
-                                      entry.getKey(),
-                                      ((Number) entry.getValue()).doubleValue(),
-                                      defaultSampledAt));
-                          eventPublisher.publishEvent(
-                              new CpChargingSampleEvent(
-                                  stationId,
-                                  persisted.getMetricName(),
-                                  persisted.getMetricValue(),
-                                  persisted.getUnit(),
-                                  persisted.getSampledAt()));
-                        })
-                .count();
+    List<Map.Entry<String, Object>> numericEntries =
+        payload.entrySet().stream()
+            .filter(entry -> entry.getValue() instanceof Number)
+            .filter(entry -> !"stationId".equals(entry.getKey()))
+            .toList();
+
+    numericEntries.forEach(
+        entry -> {
+          TelemetrySample persisted =
+              repository.save(
+                  new TelemetrySample(
+                      stationId, entry.getKey(), ((Number) entry.getValue()).doubleValue(), defaultSampledAt));
+          eventPublisher.publishEvent(
+              new CpChargingSampleEvent(
+                  stationId,
+                  persisted.getMetricName(),
+                  persisted.getMetricValue(),
+                  persisted.getUnit(),
+                  persisted.getSampledAt()));
+        });
+
+    int numericPayloadSamples = numericEntries.size();
 
     eventPublisher.publishEvent(
         new TelemetrySummaryEvent(

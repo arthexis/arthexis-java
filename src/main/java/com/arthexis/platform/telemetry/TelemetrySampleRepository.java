@@ -5,8 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TelemetrySampleRepository extends JpaRepository<TelemetrySample, Long> {
 
-  List<TelemetrySample> findTop120ByStationIdAndMetricNameOrderBySampledAtAsc(
+  List<TelemetrySample> findTop120ByStationIdAndMetricNameOrderBySampledAtDesc(
       String stationId, String metricName);
 
-  List<TelemetrySample> findTop10ByStationIdOrderBySampledAtDesc(String stationId);
+  List<TelemetrySample> findTop100ByStationIdOrderBySampledAtDesc(String stationId);
 }
