@@ -18,6 +18,37 @@ Install the following tools first:
 - Install **Maven 3.9+** and verify with `mvn -v`.
 - Install **Docker Desktop** and ensure Docker Compose v2 is available (`docker compose version`).
 
+
+## Raspberry Pi 4B (Debian/Ubuntu) build targets
+
+Arthexis Java is supported on **Raspberry Pi 4 Model B (64-bit OS)** for both:
+
+- **Debian 12 (Bookworm, arm64)**
+- **Ubuntu 22.04 LTS (Jammy, arm64)**
+- **Ubuntu 24.04 LTS (Noble, arm64)**
+
+Recommended minimums on Pi:
+
+- 4 GB RAM (8 GB preferred)
+- 64-bit Java 21 runtime
+- Maven 3.9+
+
+Install Java/Maven on Debian/Ubuntu ARM64:
+
+```bash
+sudo apt update
+sudo apt install -y openjdk-21-jdk maven
+java -version
+mvn -v
+```
+
+Then run the same Arthexis commands as other Linux hosts:
+
+```bash
+mvn -B test
+mvn -B spring-boot:run
+```
+
 ## 2) Clone the repository
 
 ```bash

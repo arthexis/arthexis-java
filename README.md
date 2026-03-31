@@ -23,6 +23,17 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - `com.arthexis.platform.security` – API security policy
 - `com.arthexis.platform.simulator` – OCPP charge-point simulator for local CSMS flows
 
+
+## Supported Build Targets
+
+This scaffold now has explicit build-target support for **Raspberry Pi 4 Model B (ARM64)** using:
+
+- **Debian 12 (Bookworm)**
+- **Ubuntu 22.04 LTS (Jammy)**
+- **Ubuntu 24.04 LTS (Noble)**
+
+The CI pipeline executes ARM64 compatibility checks in both Debian and Ubuntu container images to validate Arthexis Java build/test paths for Raspberry Pi-class environments.
+
 ## Quick Start
 
 ```bash
