@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arthexis Admin Console</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #0c1424; color: #e4ebf7; }
+      .wrap { max-width: 1300px; margin: 20px auto; padding: 0 16px 24px; }
+      h2, h3 { margin: 8px 0; }
+      .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+      .card { background: #111c31; border-radius: 10px; padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+      input, select, button, textarea { border: 1px solid #2a3e68; background: #0e1627; color: #e4ebf7; border-radius: 8px; padding: 8px; }
+      textarea { min-height: 64px; width: 100%; font-family: monospace; }
+      button { cursor: pointer; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; border-bottom: 1px solid #25385f; padding: 6px; vertical-align: top; }
+      th { color: #95afd9; font-weight: 600; }
+      .timeline { max-height: 240px; overflow: auto; font-size: 12px; }
+      .event { border-left: 2px solid #3e5f97; padding: 4px 8px; margin: 6px 0; background: rgba(14,22,39,.4); }
+      #wsStatus { font-size: 13px; color: #92a8ce; margin-bottom: 8px; }
+      .ok { color: #7cd6a4; }
+      .bad { color: #ff9d9d; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>Arthexis Admin Console</h2>
+      <div id="wsStatus">WebSocket: connecting…</div>
+      <div class="grid">
+        <section class="card">
+          <h3>Station list / status timeline</h3>
+          <div class="row"><button id="reloadStations">Reload stations</button></div>
+          <table>
+            <thead><tr><th>Station</th><th>Status</th><th>Tenant</th><th>Site</th><th>Updated</th></tr></thead>
+            <tbody id="stationsBody"></tbody>
+          </table>
+          <h3>Realtime timeline</h3>
+          <div id="timeline" class="timeline"></div>
+        </section>
+
+        <section class="card">
+          <h3>Connector state table</h3>
+          <div class="row"><button id="reloadConnectors">Reload connectors</button></div>
+          <table>
+            <thead><tr><th>Station</th><th>EVSE</th><th>Connector</th><th>Status</th><th>Type</th><th>Availability</th><th>At</th></tr></thead>
+            <tbody id="connectorsBody"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h3>Command submission</h3>
+          <div class="row">
+            <input id="cmdStation" placeholder="stationId" />
+            <input id="cmdComponent" value="CHARGE_POINT" placeholder="component" />
+            <input id="cmdAction" placeholder="action (e.g. Reset)" />
+          </div>
+          <div class="row">
+            <input id="cmdProfile" value="python-ocpp16" placeholder="chargerProfile" />
+            <button id="submitCommand">Submit command</button>
+          </div>
+          <textarea id="cmdPayload">{"type":"Soft"}</textarea>
+          <h3>Command status history</h3>
+          <table>
+            <thead><tr><th>Cmd ID</th><th>Station</th><th>Action</th><th>Status</th><th>Message</th><th>Updated</th></tr></thead>
+            <tbody id="commandsBody"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h3>OCPP message history</h3>
+          <div class="row">
+            <input id="msgStationFilter" placeholder="optional stationId filter" />
+            <button id="reloadMessages">Reload messages</button>
+          </div>
+          <table>
+            <thead><tr><th>Station</th><th>Session</th><th>Direction</th><th>Action</th><th>Parse</th><th>Result</th><th>Sampled</th></tr></thead>
+            <tbody id="messagesBody"></tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script>
+      const wsStatus = document.getElementById('wsStatus');
+      const timeline = document.getElementById('timeline');
+
+      const stationsBody = document.getElementById('stationsBody');
+      const connectorsBody = document.getElementById('connectorsBody');
+      const commandsBody = document.getElementById('commandsBody');
+      const messagesBody = document.getElementById('messagesBody');
+
+      function asText(v) { return v === null || v === undefined ? '' : String(v); }
+      function at(v) { return v ? new Date(v).toLocaleString() : ''; }
+
+      function prependEvent(title, details, occurredAt) {
+        const el = document.createElement('div');
+        el.className = 'event';
+        el.textContent = `${at(occurredAt)} | ${title} | ${JSON.stringify(details)}`;
+        timeline.prepend(el);
+        while (timeline.children.length > 80) timeline.removeChild(timeline.lastChild);
+      }
+
+      async function loadStations() {
+        const res = await fetch('/admin/api/stations?page=0&size=20');
+        const page = res.ok ? await res.json() : { content: [] };
+        stationsBody.innerHTML = '';
+        page.content.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${asText(s.stationId)}</td><td>${asText(s.status)}</td><td>${asText(s.tenantId)}</td><td>${asText(s.siteId)}</td><td>${at(s.updatedAt)}</td>`;
+          stationsBody.appendChild(tr);
+        });
+      }
+
+      async function loadConnectors() {
+        const res = await fetch('/admin/api/connectors?page=0&size=30');
+        const page = res.ok ? await res.json() : { content: [] };
+        connectorsBody.innerHTML = '';
+        page.content.forEach(c => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${asText(c.stationId)}</td><td>${asText(c.evseId)}</td><td>${asText(c.connectorId)}</td><td>${asText(c.status)}</td><td>${asText(c.connectorType)}</td><td>${asText(c.availability)}</td><td>${at(c.lastStatusAt)}</td>`;
+          connectorsBody.appendChild(tr);
+        });
+      }
+
+      async function loadCommands() {
+        const res = await fetch('/admin/api/commands?page=0&size=30');
+        const page = res.ok ? await res.json() : { content: [] };
+        commandsBody.innerHTML = '';
+        page.content.forEach(c => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${asText(c.commandId)}</td><td>${asText(c.stationId)}</td><td>${asText(c.action)}</td><td>${asText(c.status)}</td><td>${asText(c.failureReason)}</td><td>${at(c.updatedAt)}</td>`;
+          commandsBody.appendChild(tr);
+        });
+      }
+
+      async function loadMessages() {
+        const stationId = document.getElementById('msgStationFilter').value.trim();
+        const query = stationId ? `?stationId=${encodeURIComponent(stationId)}&page=0&size=30` : '?page=0&size=30';
+        const res = await fetch('/admin/api/ocpp-messages' + query);
+        const page = res.ok ? await res.json() : { content: [] };
+        messagesBody.innerHTML = '';
+        page.content.forEach(m => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${asText(m.stationId)}</td><td>${asText(m.sessionId)}</td><td>${asText(m.direction)}</td><td>${asText(m.action)}</td><td>${asText(m.parseStatus)}</td><td>${asText(m.resultStatus)}</td><td>${at(m.sampledAt)}</td>`;
+          messagesBody.appendChild(tr);
+        });
+      }
+
+      async function submitCommand() {
+        let payload = {};
+        try { payload = JSON.parse(document.getElementById('cmdPayload').value || '{}'); } catch (_) {}
+        const body = {
+          stationId: document.getElementById('cmdStation').value.trim(),
+          component: document.getElementById('cmdComponent').value.trim(),
+          action: document.getElementById('cmdAction').value.trim(),
+          chargerProfile: document.getElementById('cmdProfile').value.trim(),
+          payload
+        };
+
+        const res = await fetch('/admin/api/commands', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          const result = await res.json();
+          prependEvent('admin.command.result', result, result.occurredAt);
+          await loadCommands();
+        } else {
+          prependEvent('admin.command.error', { status: res.status }, new Date().toISOString());
+        }
+      }
+
+      function bindEvent(payload) {
+        const { eventType, details, occurredAt } = payload;
+        prependEvent(eventType, details, occurredAt);
+        switch (eventType) {
+          case 'station.status.changed':
+            loadStations();
+            break;
+          case 'connector.changed':
+            loadConnectors();
+            break;
+          case 'ocpp.command.status':
+          case 'admin.command.result':
+            loadCommands();
+            break;
+          case 'session.message.persisted':
+            loadMessages();
+            break;
+        }
+      }
+
+      function connectWs() {
+        const client = Stomp.over(new SockJS('/ws/admin'));
+        client.debug = () => {};
+        client.connect({}, () => {
+          wsStatus.textContent = 'WebSocket: connected';
+          wsStatus.className = 'ok';
+          client.subscribe('/topic/admin/events', msg => bindEvent(JSON.parse(msg.body)));
+        }, () => {
+          wsStatus.textContent = 'WebSocket: disconnected';
+          wsStatus.className = 'bad';
+          setTimeout(connectWs, 2000);
+        });
+      }
+
+      document.getElementById('reloadStations').addEventListener('click', loadStations);
+      document.getElementById('reloadConnectors').addEventListener('click', loadConnectors);
+      document.getElementById('reloadMessages').addEventListener('click', loadMessages);
+      document.getElementById('submitCommand').addEventListener('click', submitCommand);
+
+      loadStations();
+      loadConnectors();
+      loadCommands();
+      loadMessages();
+      connectWs();
+    </script>
+  </body>
+</html>

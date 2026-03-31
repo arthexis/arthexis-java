@@ -20,6 +20,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/ws/admin/**")
                     .hasAnyRole("ADMIN", "OPERATOR")
+                    .requestMatchers("/admin/**")
+                    .hasAnyRole("ADMIN", "OPERATOR")
                     .requestMatchers("/cp/charging/**")
                     .hasAnyRole("CP_CUSTOMER", "ADMIN", "OPERATOR")
                     .anyRequest()
