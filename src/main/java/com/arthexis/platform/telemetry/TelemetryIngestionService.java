@@ -1,9 +1,11 @@
 package com.arthexis.platform.telemetry;
 
+import com.arthexis.platform.app.admin.TelemetrySummaryEvent;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,9 +15,12 @@ public class TelemetryIngestionService {
   public static final String STRUCTURED_SAMPLES_KEY = "_structuredSamples";
 
   private final TelemetrySampleRepository repository;
+  private final ApplicationEventPublisher eventPublisher;
 
-  public TelemetryIngestionService(TelemetrySampleRepository repository) {
+  public TelemetryIngestionService(
+      TelemetrySampleRepository repository, ApplicationEventPublisher eventPublisher) {
     this.repository = repository;
+    this.eventPublisher = eventPublisher;
   }
 
   @Transactional
@@ -25,17 +30,29 @@ public class TelemetryIngestionService {
 
     structuredSamples.forEach(sample -> repository.save(buildSample(stationId, sample, defaultSampledAt)));
 
-    payload.entrySet().stream()
-        .filter(entry -> entry.getValue() instanceof Number)
-        .filter(entry -> !"stationId".equals(entry.getKey()))
-        .forEach(
-            entry ->
-                repository.save(
-                    new TelemetrySample(
-                        stationId,
-                        entry.getKey(),
-                        ((Number) entry.getValue()).doubleValue(),
-                        defaultSampledAt)));
+    int numericPayloadSamples =
+        (int)
+            payload.entrySet().stream()
+                .filter(entry -> entry.getValue() instanceof Number)
+                .filter(entry -> !"stationId".equals(entry.getKey()))
+                .peek(
+                    entry ->
+                        repository.save(
+                            new TelemetrySample(
+                                stationId,
+                                entry.getKey(),
+                                ((Number) entry.getValue()).doubleValue(),
+                                defaultSampledAt)))
+                .count();
+
+    eventPublisher.publishEvent(
+        new TelemetrySummaryEvent(
+            stationId,
+            structuredSamples.size() + numericPayloadSamples,
+            structuredSamples.size(),
+            numericPayloadSamples,
+            defaultSampledAt,
+            Instant.now()));
   }
 
   private TelemetrySample buildSample(

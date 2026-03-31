@@ -1,9 +1,13 @@
 package com.arthexis.platform.ocpp;
 
+import com.arthexis.platform.app.admin.ConnectorChangedEvent;
+import com.arthexis.platform.app.admin.OcppMessagePersistedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,14 +18,17 @@ public class OcppSessionAuditService {
   private final OcppSessionRecordRepository sessionRepository;
   private final OcppMessageRecordRepository messageRepository;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   public OcppSessionAuditService(
       OcppSessionRecordRepository sessionRepository,
       OcppMessageRecordRepository messageRepository,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      ApplicationEventPublisher eventPublisher) {
     this.sessionRepository = sessionRepository;
     this.messageRepository = messageRepository;
     this.objectMapper = objectMapper;
+    this.eventPublisher = eventPublisher;
   }
 
   public void markSessionConnected(String sessionId) {
@@ -58,6 +65,10 @@ public class OcppSessionAuditService {
         rawPayload,
         "PARSED",
         null);
+
+    if ("StatusNotification".equals(incoming.action())) {
+      publishConnectorChanged(stationId, incoming.payload());
+    }
   }
 
   public void recordIncomingParseFailure(String sessionId, String rawPayload) {
@@ -126,6 +137,71 @@ public class OcppSessionAuditService {
             resultStatus,
             now,
             now));
+
+    eventPublisher.publishEvent(
+        new OcppMessagePersistedEvent(
+            session.getStationId(),
+            sessionId,
+            direction,
+            action,
+            parseStatus,
+            resultStatus,
+            now));
+  }
+
+  private void publishConnectorChanged(String stationId, Object payload) {
+    if (!(payload instanceof Map<?, ?> rawMap)) {
+      return;
+    }
+    @SuppressWarnings("unchecked")
+    Map<String, Object> map = (Map<String, Object>) rawMap;
+    Map<String, Object> evse = mapValue(map.get("evse"));
+
+    eventPublisher.publishEvent(
+        new ConnectorChangedEvent(
+            stationId,
+            intValue(firstNonNull(evse.get("id"), map.get("evseId"))),
+            intValue(firstNonNull(evse.get("connectorId"), map.get("connectorId"), map.get("connector"))),
+            stringValue(firstNonNull(map.get("status"), map.get("connectorStatus"))),
+            stringValue(map.get("connectorType")),
+            stringValue(firstNonNull(map.get("availability"), map.get("connectorAvailability"))),
+            Instant.now()));
+  }
+
+  private Map<String, Object> mapValue(Object value) {
+    if (value instanceof Map<?, ?> rawMap) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> casted = (Map<String, Object>) rawMap;
+      return casted;
+    }
+    return Map.of();
+  }
+
+  private Integer intValue(Object value) {
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    if (value == null) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(value.toString());
+    } catch (NumberFormatException ex) {
+      return null;
+    }
+  }
+
+  private String stringValue(Object value) {
+    return value == null ? null : value.toString();
+  }
+
+  private Object firstNonNull(Object... values) {
+    for (Object value : values) {
+      if (value != null) {
+        return value;
+      }
+    }
+    return null;
   }
 
   private String payloadToString(Object payload) {

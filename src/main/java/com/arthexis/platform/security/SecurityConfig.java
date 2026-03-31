@@ -18,6 +18,8 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers("/actuator/health/**", "/actuator/info")
                     .permitAll()
+                    .requestMatchers("/ws/admin/**")
+                    .hasAnyRole("ADMIN", "OPERATOR")
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults());

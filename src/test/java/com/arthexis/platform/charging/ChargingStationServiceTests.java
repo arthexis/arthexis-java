@@ -12,17 +12,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class ChargingStationServiceTests {
 
   @Mock private ChargingStationRepository repository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private ChargingStationService service;
 
   @BeforeEach
   void setUp() {
-    service = new ChargingStationService(repository);
+    service = new ChargingStationService(repository, eventPublisher);
   }
 
   @Test
