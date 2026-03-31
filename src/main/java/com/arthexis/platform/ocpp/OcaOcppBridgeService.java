@@ -30,35 +30,31 @@ public class OcaOcppBridgeService {
     this.payloadNormalizer = payloadNormalizer;
   }
 
-  public Map<String, Object> handleIncoming(String sessionId, OcppMessage incoming) {
+  public OcppBridgeResponse handleIncoming(String sessionId, OcppMessage incoming) {
     if (!(incoming.payload() instanceof Map<?, ?> rawPayload)) {
-      return accepted();
+      return response(null, accepted());
     }
 
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) rawPayload;
     String stationId = payloadNormalizer.resolveStationId(sessionId, payload);
 
-    switch (incoming.action()) {
+    return switch (incoming.action()) {
       case "Heartbeat" -> {
-        chargingStationService.upsertStatus(
-            stationId, "ONLINE", buildAdminDetails(payload, false));
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         stateStore.storePendingCommand(stationId, incoming.messageId(), incoming.action());
-        return Map.of("currentTime", Instant.now().toString());
+        yield response(stationId, Map.of("currentTime", Instant.now().toString()));
       }
       case "BootNotification" -> {
-        chargingStationService.upsertStatus(
-            stationId, "ONLINE", buildAdminDetails(payload, true));
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, true));
         stateStore.storePendingCommand(stationId, incoming.messageId(), incoming.action());
-        return Map.of(
-            "status", "Accepted",
-            "currentTime", Instant.now().toString(),
-            "interval", 300);
+        yield response(
+            stationId,
+            Map.of("status", "Accepted", "currentTime", Instant.now().toString(), "interval", 300));
       }
       case "StatusNotification" -> {
         String connectorStatus =
-            stringValue(
-                payload.getOrDefault("status", payload.getOrDefault("connectorStatus", "UNKNOWN")));
+            stringValue(payload.getOrDefault("status", payload.getOrDefault("connectorStatus", "UNKNOWN")));
         int evseId = resolveEvseId(payload);
         int connectorId = resolveConnectorId(payload);
         connectorStateService.upsertConnectorState(
@@ -73,12 +69,12 @@ public class OcaOcppBridgeService {
         String aggregateStatus =
             connectorStateService.deriveStationAggregateStatus(stationId, connectorStatus);
         chargingStationService.upsertStatus(stationId, aggregateStatus, buildAdminDetails(payload, false));
-        return accepted();
+        yield response(stationId, accepted());
       }
       case "MeterValues" -> {
         telemetryIngestionService.ingestMeterValues(
             stationId, payloadNormalizer.normalizeMeterValues(stationId, payload));
-        return accepted();
+        yield response(stationId, accepted());
       }
       case "TransactionEvent" -> {
         telemetryIngestionService.ingestMeterValues(
@@ -90,14 +86,15 @@ public class OcaOcppBridgeService {
         if ("Ended".equals(eventType)) {
           chargingStationService.upsertStatus(stationId, "AVAILABLE");
         }
-        return accepted();
+        yield response(stationId, accepted());
       }
-      default -> {
-        return accepted();
-      }
-    }
+      default -> response(stationId, accepted());
+    };
   }
 
+  private OcppBridgeResponse response(String stationId, Map<String, Object> payload) {
+    return new OcppBridgeResponse(stationId, payload, stringValue(payload.get("status")));
+  }
 
   private int resolveEvseId(Map<String, Object> payload) {
     Map<String, Object> evse = mapValue(payload.get("evse"));
@@ -108,11 +105,7 @@ public class OcaOcppBridgeService {
   private int resolveConnectorId(Map<String, Object> payload) {
     Map<String, Object> evse = mapValue(payload.get("evse"));
     Object connectorId =
-        firstNonNull(
-            evse.get("connectorId"),
-            payload.get("connectorId"),
-            payload.get("connector"),
-            1);
+        firstNonNull(evse.get("connectorId"), payload.get("connectorId"), payload.get("connector"), 1);
     return intValue(connectorId, 1);
   }
 
@@ -134,11 +127,11 @@ public class OcaOcppBridgeService {
 
     String model =
         firstNonBlank(
-            stringValue(payload.get("chargePointModel")),
-            stringValue(chargingStation.get("model")));
+            stringValue(payload.get("chargePointModel")), stringValue(chargingStation.get("model")));
 
     String protocolVersion =
-        firstNonBlank(stringValue(payload.get("ocppVersion")), stringValue(payload.get("protocolVersion")));
+        firstNonBlank(
+            stringValue(payload.get("ocppVersion")), stringValue(payload.get("protocolVersion")));
 
     String firmwareVersion =
         firstNonBlank(
@@ -191,10 +184,10 @@ public class OcaOcppBridgeService {
   private String nullIfBlank(String value) {
     return (value == null || value.isBlank()) ? null : value;
   }
+
   private String stringValue(Object value) {
     return value == null ? "" : value.toString();
   }
-
 
   private Object firstNonNull(Object... values) {
     for (Object value : values) {
