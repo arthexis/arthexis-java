@@ -200,7 +200,15 @@ public class OcaOcppBridgeService {
       return Instant.now();
     }
     if (timestamp instanceof Number number) {
-      return Instant.ofEpochMilli(number.longValue());
+      long numericTimestamp = number.longValue();
+      long absoluteTimestamp = Math.abs(numericTimestamp);
+      if (absoluteTimestamp <= 9_999_999_999L) {
+        return Instant.ofEpochSecond(numericTimestamp);
+      }
+      if (absoluteTimestamp >= 1_000_000_000_000L) {
+        return Instant.ofEpochMilli(numericTimestamp);
+      }
+      return Instant.now();
     }
     String value = timestamp.toString();
     try {
