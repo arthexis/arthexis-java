@@ -14,23 +14,34 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
   private final ObjectMapper objectMapper;
   private final OcaOcppBridgeService ocaOcppBridgeService;
   private final OcppSessionAuditService sessionAuditService;
+  private final OcppCommandDispatchService commandDispatchService;
+  private final OcppOutboundSessionRouter outboundSessionRouter;
+  private final OcppSessionStateStore stateStore;
 
   public OcppWebSocketHandler(
       ObjectMapper objectMapper,
       OcaOcppBridgeService ocaOcppBridgeService,
-      OcppSessionAuditService sessionAuditService) {
+      OcppSessionAuditService sessionAuditService,
+      OcppCommandDispatchService commandDispatchService,
+      OcppOutboundSessionRouter outboundSessionRouter,
+      OcppSessionStateStore stateStore) {
     this.objectMapper = objectMapper;
     this.ocaOcppBridgeService = ocaOcppBridgeService;
     this.sessionAuditService = sessionAuditService;
+    this.commandDispatchService = commandDispatchService;
+    this.outboundSessionRouter = outboundSessionRouter;
+    this.stateStore = stateStore;
   }
 
   @Override
   public void afterConnectionEstablished(WebSocketSession session) {
+    outboundSessionRouter.registerSession(session);
     sessionAuditService.markSessionConnected(session.getId());
   }
 
   @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+    outboundSessionRouter.unRegisterSession(session);
     sessionAuditService.markSessionDisconnected(session.getId());
   }
 
@@ -44,7 +55,15 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
       throw ex;
     }
 
+    if ("CALLRESULT".equals(incoming.messageType())) {
+      commandDispatchService.acknowledgeByMessageId(incoming.messageId());
+      sessionAuditService.recordIncomingParsed(session.getId(), incoming, null, message.getPayload());
+      return;
+    }
+
     OcppBridgeResponse bridgeResponse = ocaOcppBridgeService.handleIncoming(session.getId(), incoming);
+    outboundSessionRouter.bindStationToSession(bridgeResponse.stationId(), session.getId());
+    stateStore.bindStationSession(bridgeResponse.stationId(), session.getId());
     sessionAuditService.recordIncomingParsed(
         session.getId(), incoming, bridgeResponse.stationId(), message.getPayload());
 

@@ -37,7 +37,14 @@ arthexis:
     startup-budget: 90s
     migration-budget: 30s
   jobs:
+    station-poll-enabled: true
     station-poll-delay-ms: 60000
+  ocpp:
+    commands:
+      retry-delay: 20s
+      ack-timeout: 45s
+      max-retries: 3
+      scheduler-delay-ms: 5000
 
 logging:
   pattern:
