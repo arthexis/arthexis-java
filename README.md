@@ -21,6 +21,7 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - `com.arthexis.platform.operations` – async/scheduled orchestration
 - `com.arthexis.platform.telemetry` – telemetry ingestion and persistence primitives
 - `com.arthexis.platform.security` – API security policy
+- `com.arthexis.platform.simulator` – OCPP charge-point simulator for local CSMS flows
 
 ## Quick Start
 
@@ -30,6 +31,14 @@ mvn spring-boot:run
 ```
 
 Use `SPRING_PROFILES_ACTIVE=h2` for local in-memory mode.
+
+Enable the built-in charge-point simulator when you want this app to emulate a station and connect to a CSMS:
+
+```bash
+ARTHEXIS_OCPP_SIMULATOR_ENABLED=true mvn spring-boot:run
+```
+
+By default, the simulator targets `ws://localhost:8080/ws/ocpp` and identifies as `sim-cp-001`.
 
 If you want JWT/OAuth2 resource-server validation enabled, set:
 

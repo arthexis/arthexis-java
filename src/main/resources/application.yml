@@ -38,6 +38,13 @@ arthexis:
     migration-budget: 30s
   jobs:
     station-poll-delay-ms: 60000
+  ocpp:
+    simulator:
+      enabled: false
+      csms-url: ws://localhost:8080/ws/ocpp
+      charge-point-id: sim-cp-001
+      heartbeat-interval: 60s
+      reconnect-delay: 10s
 
 logging:
   pattern:
