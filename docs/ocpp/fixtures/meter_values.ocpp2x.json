@@ -1,0 +1,39 @@
+{
+  "name": "meter_values_ocpp2x_session_fallback_and_meter_values_array",
+  "action": "MeterValues",
+  "ocppVariant": "2.x",
+  "sessionId": "session-meter-2x",
+  "payload": {
+    "meterValues": [
+      {
+        "timestamp": "2026-03-31T00:05:00Z",
+        "sampledValue": [
+          {
+            "measurand": "Energy.Active.Import.Register",
+            "value": "12.3"
+          },
+          {
+            "measurand": "Power.Active.Import",
+            "value": "invalid-number"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "resolvedStationId": "session-meter-2x",
+    "normalized": {
+      "stationId": "session-meter-2x",
+      "sampledAt": "2026-03-31T00:05:00Z",
+      "Energy.Active.Import.Register": 12.3
+    },
+    "types": {
+      "stationId": "string",
+      "sampledAt": "string",
+      "Energy.Active.Import.Register": "number"
+    },
+    "absentKeys": [
+      "Power.Active.Import"
+    ]
+  }
+}

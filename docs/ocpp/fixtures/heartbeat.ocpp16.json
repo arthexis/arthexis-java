@@ -1,0 +1,10 @@
+{
+  "name": "heartbeat_ocpp16_session_fallback",
+  "action": "Heartbeat",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-heartbeat-16",
+  "payload": {},
+  "expected": {
+    "resolvedStationId": "session-heartbeat-16"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "transaction_event_ocpp16_station_id",
+  "action": "TransactionEvent",
+  "ocppVariant": "1.6J-compat",
+  "sessionId": "session-tx-16",
+  "payload": {
+    "stationId": "CP-16-TX",
+    "timestamp": "2026-03-31T01:00:00Z",
+    "totalCost": 18.75,
+    "meterValue": [
+      {
+        "sampledValue": [
+          {
+            "measurand": "Energy.Active.Import.Register",
+            "value": "15.1"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-TX",
+    "normalized": {
+      "stationId": "CP-16-TX",
+      "sampledAt": "2026-03-31T01:00:00Z",
+      "totalCost": 18.75,
+      "Energy.Active.Import.Register": 15.1
+    },
+    "types": {
+      "stationId": "string",
+      "sampledAt": "string",
+      "totalCost": "number",
+      "Energy.Active.Import.Register": "number"
+    }
+  }
+}

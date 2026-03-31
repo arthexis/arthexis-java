@@ -1,0 +1,14 @@
+{
+  "name": "status_notification_ocpp16_station_id",
+  "action": "StatusNotification",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-status-16",
+  "payload": {
+    "stationId": "CP-16-STATUS",
+    "status": "Charging",
+    "connectorId": 1
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-STATUS"
+  }
+}

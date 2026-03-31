@@ -1,0 +1,37 @@
+{
+  "name": "transaction_event_ocpp2x_charging_station_serial",
+  "action": "TransactionEvent",
+  "ocppVariant": "2.x",
+  "sessionId": "session-tx-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X-TX",
+      "model": "AX-200"
+    },
+    "eventType": "Started",
+    "timestamp": "2026-03-31T01:05:00Z",
+    "meterValue": [
+      {
+        "sampledValue": [
+          {
+            "measurand": "Power.Active.Import",
+            "value": "9.1"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X-TX",
+    "normalized": {
+      "stationId": "CP-2X-TX",
+      "sampledAt": "2026-03-31T01:05:00Z",
+      "Power.Active.Import": 9.1
+    },
+    "types": {
+      "stationId": "string",
+      "sampledAt": "string",
+      "Power.Active.Import": "number"
+    }
+  }
+}
