@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -51,7 +55,7 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
       - name: Comment CI error on PR
-        if: github.event_name == 'pull_request' && steps.verify.outputs.status != '0'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.verify.outputs.status != '0'
         uses: actions/github-script@v7
         env:
           ERROR_MESSAGE: ${{ steps.verify.outputs.error_message }}

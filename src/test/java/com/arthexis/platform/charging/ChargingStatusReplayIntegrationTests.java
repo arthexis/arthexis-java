@@ -28,10 +28,6 @@ class ChargingStatusReplayIntegrationTests {
 
   @BeforeEach
   void setUp() {
-    telemetrySampleRepository.deleteAll();
-    connectorStateRepository.deleteAll();
-    chargingStationRepository.deleteAll();
-
     ApplicationEventPublisher noOpEvents = event -> {};
     bridgeService =
         new OcaOcppBridgeService(

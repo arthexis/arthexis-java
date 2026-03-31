@@ -1,4 +1,4 @@
-package com.arthexis.platform.ocpp;
+package com.arthexis.platform.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,18 +7,26 @@ import com.arthexis.platform.charging.ChargingConnectorStateService;
 import com.arthexis.platform.charging.ChargingStation;
 import com.arthexis.platform.charging.ChargingStationRepository;
 import com.arthexis.platform.charging.ChargingStationService;
+import com.arthexis.platform.ocpp.OcaOcppBridgeService;
+import com.arthexis.platform.ocpp.OcaOcppPayloadNormalizer;
+import com.arthexis.platform.ocpp.OcppMessage;
+import com.arthexis.platform.ocpp.OcppMessageRecordRepository;
+import com.arthexis.platform.ocpp.OcppSessionAuditService;
+import com.arthexis.platform.ocpp.OcppSessionRecordRepository;
+import com.arthexis.platform.ocpp.OcppSessionStateStore;
+import com.arthexis.platform.ocpp.OcppWebSocketHandler;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import com.arthexis.platform.telemetry.TelemetrySampleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
@@ -32,34 +40,23 @@ import org.springframework.web.socket.WebSocketSession;
 @DataJpaTest
 class OcppPythonSuiteReplayIntegrationTests {
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private ChargingStationRepository chargingStationRepository;
+  @Autowired private ChargingStationRepository chargingStationRepository;
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private ChargingConnectorStateRepository connectorStateRepository;
+  @Autowired private ChargingConnectorStateRepository connectorStateRepository;
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private TelemetrySampleRepository telemetrySampleRepository;
+  @Autowired private TelemetrySampleRepository telemetrySampleRepository;
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private OcppSessionRecordRepository sessionRecordRepository;
+  @Autowired private OcppSessionRecordRepository sessionRecordRepository;
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private OcppMessageRecordRepository messageRecordRepository;
+  @Autowired private OcppMessageRecordRepository messageRecordRepository;
 
-  @org.springframework.beans.factory.annotation.Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private OcppWebSocketHandler webSocketHandler;
   private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
-    messageRecordRepository.deleteAll();
-    sessionRecordRepository.deleteAll();
-    telemetrySampleRepository.deleteAll();
-    connectorStateRepository.deleteAll();
-    chargingStationRepository.deleteAll();
-
     ApplicationEventPublisher noOpEvents = event -> {};
     objectMapper = new ObjectMapper();
     OcaOcppBridgeService bridgeService =
@@ -182,7 +179,7 @@ class OcppPythonSuiteReplayIntegrationTests {
   }
 
   private void replayMessage(WebSocketSession session, OcppMessage message) throws Exception {
-    webSocketHandler.handleTextMessage(session, new TextMessage(objectMapper.writeValueAsString(message)));
+    webSocketHandler.handleMessage(session, new TextMessage(objectMapper.writeValueAsString(message)));
   }
 
   @SuppressWarnings("unchecked")
@@ -212,6 +209,8 @@ class OcppPythonSuiteReplayIntegrationTests {
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
       if (message instanceof TextMessage textMessage) {
         acknowledgements.add(objectMapper.readValue(textMessage.getPayload(), OcppMessage.class));
+      } else {
+        throw new IllegalArgumentException("Unexpected message type: " + message.getClass());
       }
     }
 
@@ -231,7 +230,7 @@ class OcppPythonSuiteReplayIntegrationTests {
     }
 
     @Override
-    public Principal getPrincipal() {
+    public java.security.Principal getPrincipal() {
       return null;
     }
 

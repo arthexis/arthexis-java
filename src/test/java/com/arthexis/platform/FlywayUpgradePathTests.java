@@ -12,12 +12,15 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class FlywayUpgradePathTests {
 
+  @TempDir Path tempDir;
+
   @Test
   void migratesExistingInstallFromV1ToLatest() throws Exception {
-    Path databaseFile = Files.createTempFile("arthexis-upgrade", ".db");
+    Path databaseFile = Files.createTempFile(tempDir, "arthexis-upgrade", ".db");
     String databaseUrl =
         "jdbc:h2:file:"
             + databaseFile.toAbsolutePath()
@@ -67,13 +70,11 @@ class FlywayUpgradePathTests {
         }
       }
     }
-
-    cleanup(databaseFile);
   }
 
   @Test
   void migratesExistingInstallFromV2ToLatestWithoutTelemetryDataLoss() throws Exception {
-    Path databaseFile = Files.createTempFile("arthexis-upgrade-v2", ".db");
+    Path databaseFile = Files.createTempFile(tempDir, "arthexis-upgrade-v2", ".db");
     String databaseUrl =
         "jdbc:h2:file:"
             + databaseFile.toAbsolutePath()
@@ -124,8 +125,6 @@ class FlywayUpgradePathTests {
         }
       }
     }
-
-    cleanup(databaseFile);
   }
 
   private org.flywaydb.core.api.configuration.FluentConfiguration flywayFor(String databaseUrl) {
@@ -135,9 +134,4 @@ class FlywayUpgradePathTests {
         .cleanDisabled(true);
   }
 
-  private void cleanup(Path databaseFile) throws Exception {
-    Files.deleteIfExists(databaseFile);
-    Files.deleteIfExists(Path.of(databaseFile + ".mv.db"));
-    Files.deleteIfExists(Path.of(databaseFile + ".trace.db"));
-  }
 }
