@@ -89,4 +89,57 @@ public class OcppMessageRecord {
     this.sampledAt = sampledAt;
     this.createdAt = createdAt;
   }
+
+  public OcppSessionRecord getSessionRecord() {
+    return sessionRecord;
+  }
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+  public String getStationId() {
+    return stationId;
+  }
+
+  public String getDirection() {
+    return direction;
+  }
+
+  public String getMessageType() {
+    return messageType;
+  }
+
+  public String getAction() {
+    return action;
+  }
+
+  public String getMessageId() {
+    return messageId;
+  }
+
+  public String getPayloadSnapshot() {
+    return payloadSnapshot;
+  }
+
+  public boolean isPayloadTruncated() {
+    return payloadTruncated;
+  }
+
+  public String getParseStatus() {
+    return parseStatus;
+  }
+
+  public String getResultStatus() {
+    return resultStatus;
+  }
+
+  public Instant getSampledAt() {
+    return sampledAt;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
 }
+
