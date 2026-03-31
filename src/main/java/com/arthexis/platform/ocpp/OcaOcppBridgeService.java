@@ -88,6 +88,37 @@ public class OcaOcppBridgeService {
         }
         yield response(stationId, accepted());
       }
+      case "Authorize" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeAuthorize(stationId, payload);
+        String authorizationStatus =
+            normalized.containsKey("idTag") || normalized.containsKey("idToken")
+                ? "Accepted"
+                : "Invalid";
+        yield response(stationId, Map.of("idTagInfo", Map.of("status", authorizationStatus)));
+      }
+      case "DiagnosticsStatusNotification" -> {
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        yield response(stationId, accepted());
+      }
+      case "FirmwareStatusNotification" -> {
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        yield response(stationId, accepted());
+      }
+      case "AvailabilityStatusNotification" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeAvailabilityStatus(stationId, payload);
+        int evseId = intValue(normalized.get("evseId"), 1);
+        int connectorId = intValue(normalized.get("connectorId"), 1);
+        String availabilityStatus = stringValue(normalized.getOrDefault("status", "Operative"));
+        connectorStateService.upsertConnectorState(
+            stationId,
+            evseId,
+            connectorId,
+            availabilityStatus,
+            "",
+            availabilityStatus,
+            resolveEventTimestamp(normalized));
+        yield response(stationId, accepted());
+      }
       default -> response(stationId, accepted());
     };
   }
@@ -209,6 +240,18 @@ public class OcaOcppBridgeService {
       return Integer.parseInt(value.toString());
     } catch (NumberFormatException ex) {
       return defaultValue;
+    }
+  }
+
+  private Instant resolveEventTimestamp(Map<String, Object> normalized) {
+    String timestamp = stringValue(normalized.get("timestamp"));
+    if (timestamp.isBlank()) {
+      return Instant.now();
+    }
+    try {
+      return Instant.parse(timestamp);
+    } catch (Exception ex) {
+      return Instant.now();
     }
   }
 

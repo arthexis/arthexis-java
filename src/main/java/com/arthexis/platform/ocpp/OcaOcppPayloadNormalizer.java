@@ -70,6 +70,77 @@ public class OcaOcppPayloadNormalizer {
     return normalized;
   }
 
+  public Map<String, Object> normalizeAuthorize(String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    copyIfPresent(normalized, payload, "idToken");
+    copyIfPresent(normalized, payload, "idTag");
+    copyIfPresent(normalized, payload, "certificateStatus");
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeDiagnosticsStatus(
+      String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    String status =
+        firstNonBlank(
+            stringValue(payload.get("status")),
+            stringValue(payload.get("uploadStatus")),
+            stringValue(payload.get("diagnosticsStatus")));
+    if (!status.isBlank()) {
+      normalized.put("status", status);
+    }
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeFirmwareStatus(String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    String status =
+        firstNonBlank(
+            stringValue(payload.get("status")),
+            stringValue(payload.get("firmwareStatus")),
+            stringValue(payload.get("updateStatus")));
+    if (!status.isBlank()) {
+      normalized.put("status", status);
+    }
+    copyIfPresent(normalized, payload, "requestId");
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeAvailabilityStatus(
+      String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    String status =
+        firstNonBlank(
+            stringValue(payload.get("status")),
+            stringValue(payload.get("operationalStatus")),
+            stringValue(payload.get("availabilityType")));
+    if (!status.isBlank()) {
+      normalized.put("status", status);
+    }
+    String evseId = resolveEvseId(payload);
+    String connectorId = resolveConnectorId(payload);
+    if (!evseId.isBlank()) {
+      normalized.put("evseId", evseId);
+    }
+    if (!connectorId.isBlank()) {
+      normalized.put("connectorId", connectorId);
+    }
+
+    String timestamp =
+        firstNonBlank(
+            stringValue(payload.get("timestamp")),
+            stringValue(payload.get("timeStamp")),
+            stringValue(payload.get("eventTimestamp")));
+    if (!timestamp.isBlank()) {
+      normalized.put("timestamp", timestamp);
+    }
+    return normalized;
+  }
+
   private NormalizedSampleExtraction extractSampledValues(Map<String, Object> payload) {
     Map<String, Object> flattened = new LinkedHashMap<>();
     List<Map<String, Object>> structuredSamples = new ArrayList<>();

@@ -21,12 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OcppCommandDispatchService implements AdminCommandGateway {
 
-  private static final Set<String> PYTHON_TESTED_PROFILE_OCPP16_ACTIONS =
-      Set.of("RemoteStartTransaction", "RemoteStopTransaction", "ChangeAvailability", "Reset");
-
-  private static final Set<String> PYTHON_TESTED_PROFILE_OCPP2X_ACTIONS =
-      Set.of("RequestStartTransaction", "RequestStopTransaction", "SetChargingProfile", "Reset");
-
   private final OcppCommandRecordRepository commandRepository;
   private final OcppOutboundSessionRouter sessionRouter;
   private final OcppSessionStateStore stateStore;
@@ -194,9 +188,15 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
     if (blank(action)) {
       return false;
     }
-    String normalized = profile.toLowerCase();
-    Set<String> supported =
-        normalized.contains("2") ? PYTHON_TESTED_PROFILE_OCPP2X_ACTIONS : PYTHON_TESTED_PROFILE_OCPP16_ACTIONS;
+    String normalizedProfile = blank(profile) ? "python-ocpp16" : profile.trim().toLowerCase();
+    Map<String, Set<String>> capabilities = properties.getProfileCapabilities();
+    Set<String> supported = capabilities.get(normalizedProfile);
+    if (supported == null || supported.isEmpty()) {
+      supported =
+          normalizedProfile.contains("2")
+              ? capabilities.getOrDefault("python-ocpp2x", Set.of())
+              : capabilities.getOrDefault("python-ocpp16", Set.of());
+    }
     return supported.contains(action);
   }
 

@@ -1,0 +1,21 @@
+{
+  "name": "diagnostics_status_ocpp16_uploading",
+  "action": "DiagnosticsStatusNotification",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-diag-16",
+  "payload": {
+    "stationId": "CP-16-DIAG",
+    "status": "Uploading"
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-DIAG",
+    "normalized": {
+      "stationId": "CP-16-DIAG",
+      "status": "Uploading"
+    },
+    "types": {
+      "stationId": "string",
+      "status": "string"
+    }
+  }
+}

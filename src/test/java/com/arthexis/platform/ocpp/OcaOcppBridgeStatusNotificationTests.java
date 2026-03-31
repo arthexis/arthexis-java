@@ -47,6 +47,65 @@ class OcaOcppBridgeStatusNotificationTests {
   }
 
   @Test
+  void returnsInvalidAuthorizeResponseWhenIdentifierIsMissing() {
+    OcppMessage incoming = new OcppMessage("2", "msg-auth", "Authorize", Map.of("stationId", "CP-16"));
+
+    OcppBridgeResponse response = bridgeService.handleIncoming("session-auth", incoming);
+
+    assertThat(response.payload()).containsEntry("idTagInfo", Map.of("status", "Invalid"));
+  }
+
+  @Test
+  void keepsFirmwareVersionFromPayloadDuringFirmwareStatusNotification() {
+    when(chargingStationRepository.findByStationId("CP-16")).thenReturn(Optional.empty());
+    when(chargingStationRepository.save(any(ChargingStation.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    OcppMessage incoming =
+        new OcppMessage(
+            "2",
+            "msg-fw",
+            "FirmwareStatusNotification",
+            Map.of(
+                "stationId", "CP-16",
+                "firmwareStatus", "Downloading",
+                "firmwareVersion", "1.2.3"));
+
+    bridgeService.handleIncoming("session-fw", incoming);
+
+    ArgumentCaptor<ChargingStation> stationCaptor = ArgumentCaptor.forClass(ChargingStation.class);
+    verify(chargingStationRepository).save(stationCaptor.capture());
+    assertThat(stationCaptor.getValue().getFirmwareVersion()).isEqualTo("1.2.3");
+  }
+
+  @Test
+  void usesAvailabilityPayloadTimestampForConnectorUpdate() {
+    when(connectorStateRepository.findByStationIdAndEvseIdAndConnectorId("CP-2X", 2, 1))
+        .thenReturn(Optional.empty());
+    when(connectorStateRepository.save(any(ChargingConnectorState.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    OcppMessage incoming =
+        new OcppMessage(
+            "2",
+            "msg-av",
+            "AvailabilityStatusNotification",
+            Map.of(
+                "chargingStation", Map.of("serialNumber", "CP-2X"),
+                "operationalStatus", "Inoperative",
+                "timestamp", "2026-03-31T01:02:03Z",
+                "evse", Map.of("id", 2, "connectorId", 1)));
+
+    bridgeService.handleIncoming("session-av", incoming);
+
+    ArgumentCaptor<ChargingConnectorState> connectorCaptor =
+        ArgumentCaptor.forClass(ChargingConnectorState.class);
+    verify(connectorStateRepository).save(connectorCaptor.capture());
+    assertThat(connectorCaptor.getValue().getLastStatusAt().toString())
+        .isEqualTo("2026-03-31T01:02:03Z");
+  }
+
+  @Test
   void mapsStatusNotificationToConnectorStateAndStationAggregateStatus() {
     when(connectorStateRepository.findByStationIdAndEvseIdAndConnectorId("CP-16", 1, 2))
         .thenReturn(Optional.empty());

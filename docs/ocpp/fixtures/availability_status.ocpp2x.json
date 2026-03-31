@@ -1,0 +1,31 @@
+{
+  "name": "availability_status_ocpp2x_inoperative",
+  "action": "AvailabilityStatusNotification",
+  "ocppVariant": "2.x",
+  "sessionId": "session-avail-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X-AVL"
+    },
+    "operationalStatus": "Inoperative",
+    "evse": {
+      "id": 2,
+      "connectorId": 1
+    }
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X-AVL",
+    "normalized": {
+      "stationId": "CP-2X-AVL",
+      "status": "Inoperative",
+      "evseId": "2",
+      "connectorId": "1"
+    },
+    "types": {
+      "stationId": "string",
+      "status": "string",
+      "evseId": "string",
+      "connectorId": "string"
+    }
+  }
+}

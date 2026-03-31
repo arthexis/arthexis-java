@@ -11,6 +11,10 @@ Supported incoming actions:
 - `StatusNotification`
 - `MeterValues`
 - `TransactionEvent`
+- `Authorize`
+- `DiagnosticsStatusNotification`
+- `FirmwareStatusNotification`
+- `AvailabilityStatusNotification`
 
 Supported protocol families:
 
@@ -78,6 +82,71 @@ Normalizer output contract for `TransactionEvent`:
 - Includes `totalCost` when numeric.
 - Adds measurand metrics as numeric (`Double`).
 
+### Authorize
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; identity token field recommended | `stationId`, `idTag`, `certificateStatus` | Returns normalized identity token hints without changing metering behavior. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `idToken`, `certificateStatus` | `idToken` and legacy `idTag` are both accepted. |
+
+Normalizer output contract for `Authorize`:
+
+- Always includes `stationId` as string.
+- Includes `idToken` and/or `idTag` when present.
+- Includes `certificateStatus` when present.
+
+### DiagnosticsStatusNotification
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none | `stationId`, `status` | Status is captured for bridge-side lifecycle tracking. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `uploadStatus`, `diagnosticsStatus` | Fallback order is `status` → `uploadStatus` → `diagnosticsStatus`. |
+
+Normalizer output contract for diagnostics status:
+
+- Always includes `stationId`.
+- Includes normalized `status` when any accepted status key is present.
+
+### FirmwareStatusNotification
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none | `stationId`, `status` | Legacy field names remain valid. |
+| 2.x | none | `chargingStation.serialNumber`, `firmwareStatus`, `updateStatus`, `requestId` | Fallback order is `status` → `firmwareStatus` → `updateStatus`. |
+
+Normalizer output contract for firmware status:
+
+- Always includes `stationId`.
+- Includes normalized `status` and optional `requestId` when present.
+
+### AvailabilityStatusNotification
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J compatibility | none | `stationId`, `status`, `connectorId` | Per-connector lifecycle state supported via connector identifiers. |
+| 2.x | none | `chargingStation.serialNumber`, `operationalStatus`, `availabilityType`, `evse.id`, `evse.connectorId` | Fallback status order is `status` → `operationalStatus` → `availabilityType`. |
+
+Normalizer output contract for availability status:
+
+- Always includes `stationId`.
+- Includes normalized `status` when available.
+- Includes string `evseId` / `connectorId` when present.
+
+## Command dispatch capability registry
+
+Outgoing action support is profile-driven via `arthexis.ocpp.commands.profile-capabilities`.
+
+Default registry:
+
+- `python-ocpp16`: `RemoteStartTransaction`, `RemoteStopTransaction`, `ChangeAvailability`, `Reset`, `GetDiagnostics`, `UpdateFirmware`.
+- `python-ocpp2x`: `RequestStartTransaction`, `RequestStopTransaction`, `SetChargingProfile`, `Reset`, `ChangeAvailability`, `UpdateFirmware`.
+
+Fallback rules:
+
+1. Exact profile key match (case-insensitive) is used when configured.
+2. Unknown profiles containing `"2"` fall back to `python-ocpp2x`.
+3. All other unknown profiles fall back to `python-ocpp16`.
+
 ## Canonical fixtures
 
 Canonical fixture directory: [`docs/ocpp/fixtures`](./fixtures)
@@ -94,5 +163,9 @@ Included fixture files:
 - `meter_values.ocpp2x.json`
 - `transaction_event.ocpp16.json`
 - `transaction_event.ocpp2x.json`
+- `authorize.ocpp16.json`
+- `diagnostics_status.ocpp16.json`
+- `firmware_status.ocpp2x.json`
+- `availability_status.ocpp2x.json`
 
 These fixtures are the contract-test inputs for backward compatibility assertions in `OcaOcppPayloadNormalizerContractTests`.
