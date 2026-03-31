@@ -19,6 +19,7 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - `com.arthexis.platform.ocpp` – OCPP websocket and continuity primitives
 - `com.arthexis.platform.charging` – charging station domain model
 - `com.arthexis.platform.operations` – async/scheduled orchestration
+- `com.arthexis.platform.telemetry` – telemetry ingestion and persistence primitives
 - `com.arthexis.platform.security` – API security policy
 
 ## Quick Start
@@ -46,6 +47,6 @@ OTEL_SDK_DISABLED=false
 ## Next Steps for Arthexis Parity
 
 1. Replace baseline OCPP handler with a standards-compliant adapter (1.6/2.0.1/2.1).
-2. Add dedicated module per business app (billing, users, connectors, telemetry, firmware, etc).
+2. Continue adding dedicated business modules (billing, users, connectors, firmware, etc).
 3. Add admin UI (Jmix/Vaadin) with module-scoped CRUD and command views.
 4. Add WebAuthn4J and TOTP providers to harden operator/admin authentication.
