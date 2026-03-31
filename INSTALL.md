@@ -51,13 +51,14 @@ The app starts with the default Spring profile and connects to the Docker-backed
 
 If you want to run without Postgres, enable the `h2` profile:
 
-### macOS/Linux
+### Bash / Zsh / Git Bash
 
 ```bash
-SPRING_PROFILES_ACTIVE=h2 mvn spring-boot:run
+export SPRING_PROFILES_ACTIVE=h2
+mvn spring-boot:run
 ```
 
-### Windows PowerShell
+### PowerShell
 
 ```powershell
 $env:SPRING_PROFILES_ACTIVE = "h2"
@@ -68,13 +69,13 @@ mvn spring-boot:run
 
 If you want OAuth2 resource-server validation enabled, set:
 
-### macOS/Linux
+### Bash / Zsh / Git Bash
 
 ```bash
 export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8081/realms/arthexis
 ```
 
-### Windows PowerShell
+### PowerShell
 
 ```powershell
 $env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI = "http://localhost:8081/realms/arthexis"
@@ -87,13 +88,13 @@ Then run the app as usual.
 OpenTelemetry SDK autoconfiguration is disabled by default for local convenience.
 Enable it when your telemetry backend is available:
 
-### macOS/Linux
+### Bash / Zsh / Git Bash
 
 ```bash
 export OTEL_SDK_DISABLED=false
 ```
 
-### Windows PowerShell
+### PowerShell
 
 ```powershell
 $env:OTEL_SDK_DISABLED = "false"
