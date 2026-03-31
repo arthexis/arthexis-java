@@ -53,8 +53,7 @@ public class OcppChargePointSimulator {
     }
 
     try {
-      URI csmsUri = URI.create(properties.getCsmsUrl());
-      String target = csmsUri + "/" + properties.getChargePointId();
+      String target = URI.create(properties.getCsmsUrl()).toString();
       webSocketClient.execute(buildHandler(), target).get();
       log.info("OCPP simulator connected to {} as {}", target, properties.getChargePointId());
     } catch (Exception ex) {
