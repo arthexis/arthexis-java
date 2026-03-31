@@ -23,10 +23,7 @@ public class TelemetryIngestionService {
     Instant defaultSampledAt = extractSampledAt(payload);
     List<Map<String, Object>> structuredSamples = extractStructuredSamples(payload);
 
-    if (!structuredSamples.isEmpty()) {
-      structuredSamples.forEach(sample -> repository.save(buildSample(stationId, sample, defaultSampledAt)));
-      return;
-    }
+    structuredSamples.forEach(sample -> repository.save(buildSample(stationId, sample, defaultSampledAt)));
 
     payload.entrySet().stream()
         .filter(entry -> entry.getValue() instanceof Number)

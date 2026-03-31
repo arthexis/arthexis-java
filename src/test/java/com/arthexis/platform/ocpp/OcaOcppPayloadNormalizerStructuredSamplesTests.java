@@ -42,7 +42,7 @@ class OcaOcppPayloadNormalizerStructuredSamplesTests {
         .containsEntry("metricName", "Power.Active.Import")
         .containsEntry("metricValue", 7000.0d)
         .containsEntry("scopeType", "connector")
-        .containsEntry("scopeIdentifier", "1")
+        .containsEntry("scopeIdentifier", "evse-2:connector-1")
         .containsEntry("unit", "W")
         .containsEntry("phase", "L1")
         .containsEntry("location", "Outlet")
@@ -50,5 +50,31 @@ class OcaOcppPayloadNormalizerStructuredSamplesTests {
         .containsEntry("sampledAt", "2026-03-31T00:00:00Z");
 
     assertThat(normalized).containsEntry("Power.Active.Import", 7000.0d);
+  }
+
+  @Test
+  void includesEvseInConnectorScopeIdentifierToAvoidCrossEvseCollisions() {
+    Map<String, Object> normalized =
+        normalizer.normalizeMeterValues(
+            "station-1",
+            Map.of(
+                "meterValue",
+                    List.of(
+                        Map.of(
+                            "evse", Map.of("id", 1, "connectorId", 1),
+                            "sampledValue",
+                                List.of(Map.of("measurand", "Energy.Active.Import.Register", "value", "10"))),
+                        Map.of(
+                            "evse", Map.of("id", 2, "connectorId", 1),
+                            "sampledValue",
+                                List.of(Map.of("measurand", "Energy.Active.Import.Register", "value", "11"))))));
+
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> structuredSamples =
+        (List<Map<String, Object>>) normalized.get(TelemetryIngestionService.STRUCTURED_SAMPLES_KEY);
+
+    assertThat(structuredSamples)
+        .extracting(sample -> sample.get("scopeIdentifier"))
+        .containsExactly("evse-1:connector-1", "evse-2:connector-1");
   }
 }

@@ -170,11 +170,21 @@ public class OcaOcppPayloadNormalizer {
   private String resolveScopeIdentifier(
       String scopeType, String connectorId, String evseId, String transactionId) {
     return switch (scopeType) {
-      case "connector" -> connectorId;
+      case "connector" -> connectorScopeIdentifier(connectorId, evseId);
       case "evse" -> evseId;
       case "transaction" -> transactionId;
       default -> "";
     };
+  }
+
+  private String connectorScopeIdentifier(String connectorId, String evseId) {
+    if (connectorId.isBlank()) {
+      return "";
+    }
+    if (evseId.isBlank()) {
+      return connectorId;
+    }
+    return "evse-" + evseId + ":connector-" + connectorId;
   }
 
   private String resolveTransactionId(Map<String, Object> payload) {
