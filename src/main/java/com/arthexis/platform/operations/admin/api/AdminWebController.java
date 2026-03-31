@@ -1,4 +1,4 @@
-package com.arthexis.platform.app.admin.api;
+package com.arthexis.platform.operations.admin.api;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

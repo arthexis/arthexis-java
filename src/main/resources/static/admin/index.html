@@ -95,6 +95,11 @@
 
       function asText(v) { return v === null || v === undefined ? '' : String(v); }
       function at(v) { return v ? new Date(v).toLocaleString() : ''; }
+      function appendCell(row, value) {
+        const td = document.createElement('td');
+        td.textContent = asText(value);
+        row.appendChild(td);
+      }
 
       function prependEvent(title, details, occurredAt) {
         const el = document.createElement('div');
@@ -110,7 +115,11 @@
         stationsBody.innerHTML = '';
         page.content.forEach(s => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${asText(s.stationId)}</td><td>${asText(s.status)}</td><td>${asText(s.tenantId)}</td><td>${asText(s.siteId)}</td><td>${at(s.updatedAt)}</td>`;
+          appendCell(tr, s.stationId);
+          appendCell(tr, s.status);
+          appendCell(tr, s.tenantId);
+          appendCell(tr, s.siteId);
+          appendCell(tr, at(s.updatedAt));
           stationsBody.appendChild(tr);
         });
       }
@@ -121,7 +130,13 @@
         connectorsBody.innerHTML = '';
         page.content.forEach(c => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${asText(c.stationId)}</td><td>${asText(c.evseId)}</td><td>${asText(c.connectorId)}</td><td>${asText(c.status)}</td><td>${asText(c.connectorType)}</td><td>${asText(c.availability)}</td><td>${at(c.lastStatusAt)}</td>`;
+          appendCell(tr, c.stationId);
+          appendCell(tr, c.evseId);
+          appendCell(tr, c.connectorId);
+          appendCell(tr, c.status);
+          appendCell(tr, c.connectorType);
+          appendCell(tr, c.availability);
+          appendCell(tr, at(c.lastStatusAt));
           connectorsBody.appendChild(tr);
         });
       }
@@ -132,7 +147,12 @@
         commandsBody.innerHTML = '';
         page.content.forEach(c => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${asText(c.commandId)}</td><td>${asText(c.stationId)}</td><td>${asText(c.action)}</td><td>${asText(c.status)}</td><td>${asText(c.failureReason)}</td><td>${at(c.updatedAt)}</td>`;
+          appendCell(tr, c.commandId);
+          appendCell(tr, c.stationId);
+          appendCell(tr, c.action);
+          appendCell(tr, c.status);
+          appendCell(tr, c.failureReason);
+          appendCell(tr, at(c.updatedAt));
           commandsBody.appendChild(tr);
         });
       }
@@ -145,14 +165,25 @@
         messagesBody.innerHTML = '';
         page.content.forEach(m => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${asText(m.stationId)}</td><td>${asText(m.sessionId)}</td><td>${asText(m.direction)}</td><td>${asText(m.action)}</td><td>${asText(m.parseStatus)}</td><td>${asText(m.resultStatus)}</td><td>${at(m.sampledAt)}</td>`;
+          appendCell(tr, m.stationId);
+          appendCell(tr, m.sessionId);
+          appendCell(tr, m.direction);
+          appendCell(tr, m.action);
+          appendCell(tr, m.parseStatus);
+          appendCell(tr, m.resultStatus);
+          appendCell(tr, at(m.sampledAt));
           messagesBody.appendChild(tr);
         });
       }
 
       async function submitCommand() {
         let payload = {};
-        try { payload = JSON.parse(document.getElementById('cmdPayload').value || '{}'); } catch (_) {}
+        try {
+          payload = JSON.parse(document.getElementById('cmdPayload').value || '{}');
+        } catch (e) {
+          prependEvent('admin.command.error', { error: `Invalid JSON payload: ${e.message}` }, new Date().toISOString());
+          return;
+        }
         const body = {
           stationId: document.getElementById('cmdStation').value.trim(),
           component: document.getElementById('cmdComponent').value.trim(),

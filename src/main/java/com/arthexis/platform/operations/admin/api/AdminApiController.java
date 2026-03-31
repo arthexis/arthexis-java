@@ -1,4 +1,4 @@
-package com.arthexis.platform.app.admin.api;
+package com.arthexis.platform.operations.admin.api;
 
 import com.arthexis.platform.app.admin.AdminCommandGateway;
 import com.arthexis.platform.app.admin.AdminCommandRequest;
@@ -100,7 +100,6 @@ public class AdminApiController {
     java.util.LinkedHashMap<String, Object> item = new java.util.LinkedHashMap<>();
     item.put("stationId", station.getStationId());
     item.put("status", station.getStatus());
-    item.put("previousStatus", "");
     item.put("tenantId", empty(station.getTenantId()));
     item.put("siteId", empty(station.getSiteId()));
     item.put("lastSeenAt", station.getLastSeenAt());
@@ -144,6 +143,7 @@ public class AdminApiController {
     item.put("messageId", empty(message.getMessageId()));
     item.put("parseStatus", message.getParseStatus());
     item.put("resultStatus", empty(message.getResultStatus()));
+    item.put("payloadSnapshot", empty(message.getPayloadSnapshot()));
     item.put("sampledAt", message.getSampledAt());
     item.put("createdAt", message.getCreatedAt());
     return item;
