@@ -11,6 +11,10 @@ import com.arthexis.platform.ocpp.OcaOcppBridgeService;
 import com.arthexis.platform.ocpp.OcaOcppPayloadNormalizer;
 import com.arthexis.platform.ocpp.OcppMessage;
 import com.arthexis.platform.ocpp.OcppMessageRecordRepository;
+import com.arthexis.platform.ocpp.OcppCommandDispatchProperties;
+import com.arthexis.platform.ocpp.OcppCommandDispatchService;
+import com.arthexis.platform.ocpp.OcppCommandRecordRepository;
+import com.arthexis.platform.ocpp.OcppOutboundSessionRouter;
 import com.arthexis.platform.ocpp.OcppSessionAuditService;
 import com.arthexis.platform.ocpp.OcppSessionRecordRepository;
 import com.arthexis.platform.ocpp.OcppSessionStateStore;
@@ -50,6 +54,8 @@ class OcppPythonSuiteReplayIntegrationTests {
 
   @Autowired private OcppMessageRecordRepository messageRecordRepository;
 
+  @Autowired private OcppCommandRecordRepository commandRecordRepository;
+
   @Autowired private JdbcTemplate jdbcTemplate;
 
   private OcppWebSocketHandler webSocketHandler;
@@ -74,7 +80,31 @@ class OcppPythonSuiteReplayIntegrationTests {
         new OcppSessionAuditService(
             sessionRecordRepository, messageRecordRepository, objectMapper, noOpEvents);
 
-    webSocketHandler = new OcppWebSocketHandler(objectMapper, bridgeService, sessionAuditService);
+    OcppSessionStateStore noOpStateStore =
+        new OcppSessionStateStore(null) {
+          @Override
+          public void storePendingCommand(String stationId, String commandId, String action) {}
+
+          @Override
+          public void bindStationSession(String stationId, String sessionId) {}
+        };
+    OcppCommandDispatchService commandDispatchService =
+        new OcppCommandDispatchService(
+            commandRecordRepository,
+            new OcppOutboundSessionRouter(objectMapper),
+            noOpStateStore,
+            new OcppCommandDispatchProperties(),
+            objectMapper,
+            noOpEvents);
+
+    webSocketHandler =
+        new OcppWebSocketHandler(
+            objectMapper,
+            bridgeService,
+            sessionAuditService,
+            commandDispatchService,
+            new OcppOutboundSessionRouter(objectMapper),
+            noOpStateStore);
   }
 
   @Test
