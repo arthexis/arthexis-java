@@ -1,5 +1,6 @@
 package com.arthexis.platform.ocpp;
 
+import com.arthexis.platform.charging.ChargingConnectorStateService;
 import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
@@ -11,16 +12,19 @@ import org.springframework.stereotype.Service;
 public class OcaOcppBridgeService {
 
   private final ChargingStationService chargingStationService;
+  private final ChargingConnectorStateService connectorStateService;
   private final OcppSessionStateStore stateStore;
   private final TelemetryIngestionService telemetryIngestionService;
   private final OcaOcppPayloadNormalizer payloadNormalizer;
 
   public OcaOcppBridgeService(
       ChargingStationService chargingStationService,
+      ChargingConnectorStateService connectorStateService,
       OcppSessionStateStore stateStore,
       TelemetryIngestionService telemetryIngestionService,
       OcaOcppPayloadNormalizer payloadNormalizer) {
     this.chargingStationService = chargingStationService;
+    this.connectorStateService = connectorStateService;
     this.stateStore = stateStore;
     this.telemetryIngestionService = telemetryIngestionService;
     this.payloadNormalizer = payloadNormalizer;
@@ -52,9 +56,23 @@ public class OcaOcppBridgeService {
             "interval", 300);
       }
       case "StatusNotification" -> {
-        String status =
-            stringValue(payload.getOrDefault("status", payload.getOrDefault("connectorStatus", "ONLINE")));
-        chargingStationService.upsertStatus(stationId, status, buildAdminDetails(payload, false));
+        String connectorStatus =
+            stringValue(
+                payload.getOrDefault("status", payload.getOrDefault("connectorStatus", "UNKNOWN")));
+        int evseId = resolveEvseId(payload);
+        int connectorId = resolveConnectorId(payload);
+        connectorStateService.upsertConnectorState(
+            stationId,
+            evseId,
+            connectorId,
+            connectorStatus,
+            stringValue(payload.get("connectorType")),
+            stringValue(payload.getOrDefault("availability", payload.get("connectorAvailability"))),
+            Instant.now());
+
+        String aggregateStatus =
+            connectorStateService.deriveStationAggregateStatus(stationId, connectorStatus);
+        chargingStationService.upsertStatus(stationId, aggregateStatus, buildAdminDetails(payload, false));
         return accepted();
       }
       case "MeterValues" -> {
@@ -81,6 +99,22 @@ public class OcaOcppBridgeService {
   }
 
 
+  private int resolveEvseId(Map<String, Object> payload) {
+    Map<String, Object> evse = mapValue(payload.get("evse"));
+    Object evseId = evse.getOrDefault("id", payload.getOrDefault("evseId", 1));
+    return intValue(evseId, 1);
+  }
+
+  private int resolveConnectorId(Map<String, Object> payload) {
+    Map<String, Object> evse = mapValue(payload.get("evse"));
+    Object connectorId =
+        firstNonNull(
+            evse.get("connectorId"),
+            payload.get("connectorId"),
+            payload.get("connector"),
+            1);
+    return intValue(connectorId, 1);
+  }
 
   private ChargingStationAdminDetails buildAdminDetails(
       Map<String, Object> payload, boolean includeBootTime) {
@@ -159,6 +193,30 @@ public class OcaOcppBridgeService {
   }
   private String stringValue(Object value) {
     return value == null ? "" : value.toString();
+  }
+
+
+  private Object firstNonNull(Object... values) {
+    for (Object value : values) {
+      if (value != null) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  private int intValue(Object value, int defaultValue) {
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    if (value == null) {
+      return defaultValue;
+    }
+    try {
+      return Integer.parseInt(value.toString());
+    } catch (NumberFormatException ex) {
+      return defaultValue;
+    }
   }
 
   private Map<String, Object> accepted() {
