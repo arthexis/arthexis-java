@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        install_mode: [new-install, upgrade-install]
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 21
@@ -16,14 +20,21 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - name: Verify
+      - name: Verify (${{ matrix.install_mode }})
         id: verify
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           set +e
-          mvn -B verify 2>&1 | tee ci-verify.log
+
+          if [ "${{ matrix.install_mode }}" = "new-install" ]; then
+            verify_command="mvn -B verify"
+          else
+            verify_command="mvn -B -Dtest=FlywayUpgradePathTests test"
+          fi
+
+          bash -lc "$verify_command" 2>&1 | tee ci-verify.log
           status=${PIPESTATUS[0]}
           set -e
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -46,14 +57,15 @@ jobs:
           ERROR_MESSAGE: ${{ steps.verify.outputs.error_message }}
         with:
           script: |
-            const marker = '<!-- arthexis-ci-failure -->';
+            const marker = `<!-- arthexis-ci-failure-${{ matrix.install_mode }} -->`;
+            const mode = '${{ matrix.install_mode }}';
             const raw = process.env.ERROR_MESSAGE || 'No error details captured.';
             const maxLength = 65000;
             const content = raw.length > maxLength
               ? `${raw.slice(0, maxLength)}\n... (truncated)`
               : raw;
             const body = `${marker}
-            ⚠️ CI failed during \`mvn -B verify\`.
+            ⚠️ CI failed during ${mode} validation.
 
             \`\`\`text
             ${content}
@@ -86,5 +98,5 @@ jobs:
       - name: Fail workflow if verify failed
         if: steps.verify.outputs.status != '0'
         run: |
-          echo "Verification failed."
+          echo "Verification failed for install mode: ${{ matrix.install_mode }}"
           exit 1
