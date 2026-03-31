@@ -18,4 +18,9 @@ public class OcppSessionStateStore {
     String key = "ocpp:pending:" + stationId + ":" + commandId;
     redisTemplate.opsForValue().set(key, action, SESSION_TTL);
   }
+
+  public void bindStationSession(String stationId, String sessionId) {
+    String key = "ocpp:station-session:" + stationId;
+    redisTemplate.opsForValue().set(key, sessionId, SESSION_TTL);
+  }
 }

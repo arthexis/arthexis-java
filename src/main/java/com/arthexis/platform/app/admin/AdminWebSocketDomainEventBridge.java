@@ -63,6 +63,20 @@ public class AdminWebSocketDomainEventBridge {
     publish(new AdminRealtimePayload("session.message.persisted", event.stationId(), event.occurredAt(), details));
   }
 
+
+  @EventListener
+  public void onCommandStatusChanged(OcppCommandStatusChangedEvent event) {
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("commandId", event.commandId());
+    details.put("component", event.component());
+    details.put("action", event.action());
+    details.put("status", event.status());
+    details.put("messageId", event.messageId());
+    details.put("detail", event.detail());
+
+    publish(new AdminRealtimePayload("ocpp.command.status", event.stationId(), event.occurredAt(), details));
+  }
+
   private void publish(AdminRealtimePayload payload) {
     messagingTemplate.convertAndSend(ADMIN_TOPIC_EVENTS, payload);
   }

@@ -1,8 +1,6 @@
 package com.arthexis.platform.app.admin;
 
 import java.security.Principal;
-import java.time.Instant;
-import java.util.Map;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -14,20 +12,27 @@ public class AdminWebSocketCommandController {
   public static final String ADMIN_COMMAND_DESTINATION = "/app/admin/commands";
 
   private final SimpMessagingTemplate messagingTemplate;
+  private final AdminCommandGateway commandGateway;
 
-  public AdminWebSocketCommandController(SimpMessagingTemplate messagingTemplate) {
+  public AdminWebSocketCommandController(
+      SimpMessagingTemplate messagingTemplate, AdminCommandGateway commandGateway) {
     this.messagingTemplate = messagingTemplate;
+    this.commandGateway = commandGateway;
   }
 
   @MessageMapping("/admin/commands")
-  public void relay(@Payload Map<String, Object> command, Principal principal) {
+  public void relay(@Payload AdminCommandRequest command, Principal principal) {
     String user = principal == null ? "unknown" : principal.getName();
-    AdminRealtimePayload payload =
+    AdminCommandResult result = commandGateway.submit(command, user);
+    java.util.HashMap<String, Object> details = new java.util.HashMap<>();
+    details.put("commandId", result.commandId());
+    details.put("component", result.component());
+    details.put("action", result.action());
+    details.put("status", result.status());
+    details.put("message", result.message());
+    messagingTemplate.convertAndSend(
+        AdminWebSocketDomainEventBridge.ADMIN_TOPIC_EVENTS,
         new AdminRealtimePayload(
-            "admin.command.received",
-            String.valueOf(command.getOrDefault("stationId", "unknown")),
-            Instant.now(),
-            Map.of("user", user, "command", command));
-    messagingTemplate.convertAndSend(AdminWebSocketDomainEventBridge.ADMIN_TOPIC_EVENTS, payload);
+            "admin.command.result", result.stationId(), result.occurredAt(), details));
   }
 }

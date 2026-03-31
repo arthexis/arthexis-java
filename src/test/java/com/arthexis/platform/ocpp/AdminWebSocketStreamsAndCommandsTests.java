@@ -2,6 +2,10 @@ package com.arthexis.platform.ocpp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.arthexis.platform.app.admin.AdminCommandGateway;
+import com.arthexis.platform.app.admin.AdminCommandRequest;
+import com.arthexis.platform.app.admin.AdminCommandResult;
+import com.arthexis.platform.app.admin.AdminCommandStatus;
 import com.arthexis.platform.app.admin.AdminRealtimePayload;
 import com.arthexis.platform.app.admin.AdminWebSocketCommandController;
 import com.arthexis.platform.app.admin.AdminWebSocketDomainEventBridge;
@@ -52,18 +56,31 @@ class AdminWebSocketStreamsAndCommandsTests {
   void relaysAdminCommandsWithUserIdentity() {
     CapturingMessageChannel channel = new CapturingMessageChannel();
     SimpMessagingTemplate messagingTemplate = new SimpMessagingTemplate(channel);
-    AdminWebSocketCommandController controller = new AdminWebSocketCommandController(messagingTemplate);
+    AdminCommandGateway gateway =
+        (request, user) ->
+            new AdminCommandResult(
+                "cmd-1",
+                request.stationId(),
+                request.component(),
+                request.action(),
+                AdminCommandStatus.SENT,
+                "queued",
+                Instant.now());
+    AdminWebSocketCommandController controller =
+        new AdminWebSocketCommandController(messagingTemplate, gateway);
 
     Principal principal = () -> "ops-user";
-    controller.relay(Map.of("stationId", "CP-ADMIN-2", "command", "refresh"), principal);
+    controller.relay(
+        new AdminCommandRequest(
+            "CP-ADMIN-2", "CHARGE_POINT", "Reset", "python-ocpp16", Map.of("type", "Soft")), principal);
 
     assertThat(channel.payloads).hasSize(1);
     AdminRealtimePayload payload = channel.payloads.getFirst();
-    assertThat(payload.eventType()).isEqualTo("admin.command.received");
+    assertThat(payload.eventType()).isEqualTo("admin.command.result");
     assertThat(payload.stationId()).isEqualTo("CP-ADMIN-2");
-    assertThat(payload.details()).containsEntry("user", "ops-user");
-    assertThat(payload.details())
-        .containsEntry("command", Map.of("stationId", "CP-ADMIN-2", "command", "refresh"));
+    assertThat(payload.details()).containsEntry("commandId", "cmd-1");
+    assertThat(payload.details()).containsEntry("action", "Reset");
+    assertThat(payload.details()).containsEntry("status", AdminCommandStatus.SENT);
   }
 
   private static class CapturingMessageChannel implements MessageChannel {

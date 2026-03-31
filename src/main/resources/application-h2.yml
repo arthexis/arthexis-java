@@ -8,3 +8,7 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+
+arthexis:
+  jobs:
+    station-poll-enabled: false
