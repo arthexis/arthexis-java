@@ -105,14 +105,15 @@ jobs:
           echo "Verification failed for install mode: ${{ matrix.install_mode }}"
           exit 1
 
-  raspberry-pi-compat:
+  rpi-compat:
+    name: rpi-compat (${{ matrix.distro }} / ${{ matrix.install_mode }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - distro: debian-bookworm
-            image: maven:3.9.9-eclipse-temurin-21-bookworm
+            image: maven:3.9.9-eclipse-temurin-21
             install_mode: new-install
           - distro: ubuntu-jammy
             image: maven:3.9.9-eclipse-temurin-21-jammy
@@ -121,7 +122,7 @@ jobs:
             image: maven:3.9.9-eclipse-temurin-21-noble
             install_mode: new-install
           - distro: debian-bookworm-upgrade
-            image: maven:3.9.9-eclipse-temurin-21-bookworm
+            image: maven:3.9.9-eclipse-temurin-21
             install_mode: upgrade-install
           - distro: ubuntu-jammy-upgrade
             image: maven:3.9.9-eclipse-temurin-21-jammy
@@ -135,7 +136,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
-      - name: Run Raspberry Pi 4B ARM64 compatibility tests (${{ matrix.distro }})
+      - name: Run rpi-compat tests (${{ matrix.distro }})
         shell: bash
         run: |
           set -euo pipefail
