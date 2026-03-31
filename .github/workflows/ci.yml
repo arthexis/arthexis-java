@@ -115,17 +115,11 @@ jobs:
           - distro: debian-bookworm
             image: maven:3.9.9-eclipse-temurin-21
             install_mode: new-install
-          - distro: ubuntu-jammy
-            image: maven:3.9.9-eclipse-temurin-21-jammy
-            install_mode: new-install
           - distro: ubuntu-noble
             image: maven:3.9.9-eclipse-temurin-21-noble
             install_mode: new-install
           - distro: debian-bookworm-upgrade
             image: maven:3.9.9-eclipse-temurin-21
-            install_mode: upgrade-install
-          - distro: ubuntu-jammy-upgrade
-            image: maven:3.9.9-eclipse-temurin-21-jammy
             install_mode: upgrade-install
           - distro: ubuntu-noble-upgrade
             image: maven:3.9.9-eclipse-temurin-21-noble
