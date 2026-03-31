@@ -81,7 +81,7 @@ public class RfidAuthorizationService implements RfidAuthorizationGateway {
     String loginUrl = issueLoginQr(stationId, cardUid);
     return new AuthorizationDecision(
         false,
-        "ConcurrentTx",
+        "Blocked",
         "ACCOUNT_LOGIN",
         accountId(card),
         loginUrl,
@@ -110,6 +110,10 @@ public class RfidAuthorizationService implements RfidAuthorizationGateway {
       return new AuthorizationDecision(false, "Expired", "ACCOUNT_LOGIN", null, null, "login_session_expired");
     }
 
+    if (session.getStatus() != LoginSessionStatus.PENDING) {
+      return new AuthorizationDecision(false, "Invalid", "ACCOUNT_LOGIN", null, null, "login_session_not_pending");
+    }
+
     EnergyAccount account =
         accountRepository
             .findByAccountExternalId(accountExternalId)
@@ -120,9 +124,12 @@ public class RfidAuthorizationService implements RfidAuthorizationGateway {
             .findByCardUid(session.getCardUid())
             .orElseThrow(() -> new IllegalArgumentException("RFID card not found"));
 
-    if (card.getEnergyAccount() == null || !Objects.equals(card.getEnergyAccount().getId(), account.getId())) {
+    if (card.getEnergyAccount() == null) {
       card.linkToAccount(account, card.isLinkApprovalRequired());
       cardRepository.save(card);
+    } else if (!Objects.equals(card.getEnergyAccount().getId(), account.getId())) {
+      return new AuthorizationDecision(
+          false, "Invalid", "ACCOUNT_LOGIN", accountExternalId, null, "card_already_linked");
     }
 
     session.markCompleted(accountExternalId);

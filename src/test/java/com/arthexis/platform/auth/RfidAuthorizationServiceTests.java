@@ -42,6 +42,7 @@ class RfidAuthorizationServiceTests {
     AuthorizationDecision initial = service.authorize("CP-02", "CARD-002");
 
     assertThat(initial.accepted()).isFalse();
+    assertThat(initial.ocppStatus()).isEqualTo("Blocked");
     assertThat(initial.loginUrl()).contains("token=");
 
     String token = initial.loginUrl().substring(initial.loginUrl().indexOf("token=") + 6);
@@ -51,6 +52,57 @@ class RfidAuthorizationServiceTests {
     AuthorizationDecision afterLogin = service.authorize("CP-02", "CARD-002");
     assertThat(afterLogin.accepted()).isTrue();
     assertThat(afterLogin.reason()).isEqualTo("indirect_login_verified");
+  }
+
+  @Test
+  void rejectsReusedLoginTokens() {
+    service.linkCardToAccount(
+        new RfidCardLinkRequest(
+            "CARD-004",
+            "acct-400",
+            RfidAuthMode.ACCOUNT_LOGIN,
+            false,
+            "D User",
+            "d@example.com"));
+
+    AuthorizationDecision initial = service.authorize("CP-04", "CARD-004");
+    String token = initial.loginUrl().substring(initial.loginUrl().indexOf("token=") + 6);
+
+    AuthorizationDecision firstCompletion = service.completeLogin(token, "acct-400");
+    AuthorizationDecision replayCompletion = service.completeLogin(token, "acct-400");
+
+    assertThat(firstCompletion.accepted()).isTrue();
+    assertThat(replayCompletion.accepted()).isFalse();
+    assertThat(replayCompletion.reason()).isEqualTo("login_session_not_pending");
+  }
+
+  @Test
+  void doesNotAllowLoginCompletionToRelinkCardToDifferentAccount() {
+    service.linkCardToAccount(
+        new RfidCardLinkRequest(
+            "CARD-005",
+            "acct-500",
+            RfidAuthMode.ACCOUNT_LOGIN,
+            false,
+            "E User",
+            "e@example.com"));
+
+    service.linkCardToAccount(
+        new RfidCardLinkRequest(
+            "CARD-006",
+            "acct-600",
+            RfidAuthMode.DIRECT,
+            false,
+            "F User",
+            "f@example.com"));
+
+    AuthorizationDecision initial = service.authorize("CP-05", "CARD-005");
+    String token = initial.loginUrl().substring(initial.loginUrl().indexOf("token=") + 6);
+
+    AuthorizationDecision rejected = service.completeLogin(token, "acct-600");
+
+    assertThat(rejected.accepted()).isFalse();
+    assertThat(rejected.reason()).isEqualTo("card_already_linked");
   }
 
   @Test

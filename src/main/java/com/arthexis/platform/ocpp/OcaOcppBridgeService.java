@@ -175,32 +175,32 @@ public class OcaOcppBridgeService {
   }
 
   private Map<String, Object> authorizePayload(AuthorizationDecision decision, Map<String, Object> payload) {
-    Map<String, Object> idTagInfo =
-        Map.of(
-            "status", decision.ocppStatus(),
-            "authMode", decision.authMode(),
-            "reason", decision.reason());
-
     String cardUid = resolveCardUid(payload);
     if (payload.containsKey("idToken")) {
+      Map<String, Object> idTokenInfo =
+          Map.of(
+              "status", decision.ocppStatus(),
+              "customData", Map.of("authMode", decision.authMode(), "reason", decision.reason()));
+
       return decision.loginUrl() == null
           ? Map.of(
-              "status", decision.ocppStatus(),
-              "idTokenInfo", idTagInfo,
-              "customData", Map.of("accountExternalId", nullable(decision.accountExternalId()), "cardUid", cardUid))
+              "idTokenInfo",
+              idTokenInfo,
+              "customData",
+              Map.of(
+                  "accountExternalId", nullable(decision.accountExternalId()),
+                  "cardUid", nullable(cardUid)))
           : Map.of(
-              "status", decision.ocppStatus(),
-              "idTokenInfo", idTagInfo,
+              "idTokenInfo",
+              idTokenInfo,
               "customData",
                   Map.of(
                       "accountExternalId", nullable(decision.accountExternalId()),
-                      "cardUid", cardUid,
+                      "cardUid", nullable(cardUid),
                       "loginUrl", decision.loginUrl()));
     }
 
-    return decision.loginUrl() == null
-        ? Map.of("status", decision.ocppStatus(), "idTagInfo", idTagInfo)
-        : Map.of("status", decision.ocppStatus(), "idTagInfo", idTagInfo, "loginUrl", decision.loginUrl());
+    return Map.of("idTagInfo", Map.of("status", decision.ocppStatus()));
   }
 
   private String nullable(String value) {
