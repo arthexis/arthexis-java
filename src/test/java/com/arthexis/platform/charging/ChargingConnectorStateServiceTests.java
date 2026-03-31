@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,5 +60,28 @@ class ChargingConnectorStateServiceTests {
     assertThat(connectorState.getConnectorType()).isEqualTo("IEC_62196_2");
     assertThat(connectorState.getAvailability()).isEqualTo("OPERATIVE");
     assertThat(connectorState.getLastStatusAt()).isNotNull();
+  }
+
+  @Test
+  void upsertDoesNotEraseOptionalFieldsWhenPayloadOmitsThem() {
+    ChargingConnectorState existing =
+        new ChargingConnectorState(
+            "CP-4",
+            2,
+            1,
+            "AVAILABLE",
+            "CCS2",
+            "OPERATIVE",
+            Instant.parse("2026-03-30T10:00:00Z"));
+    when(repository.findByStationIdAndEvseIdAndConnectorId("CP-4", 2, 1)).thenReturn(Optional.of(existing));
+    when(repository.save(any(ChargingConnectorState.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    ChargingConnectorState connectorState =
+        service.upsertConnectorState(
+            "CP-4", 2, 1, "Charging", null, null, Instant.parse("2026-03-30T10:05:00Z"));
+
+    assertThat(connectorState.getConnectorStatus()).isEqualTo("CHARGING");
+    assertThat(connectorState.getConnectorType()).isEqualTo("CCS2");
+    assertThat(connectorState.getAvailability()).isEqualTo("OPERATIVE");
   }
 }

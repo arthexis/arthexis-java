@@ -13,6 +13,7 @@ import com.arthexis.platform.charging.ChargingStationRepository;
 import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import com.arthexis.platform.telemetry.TelemetrySampleRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -118,5 +119,51 @@ class OcaOcppBridgeStatusNotificationTests {
     assertThat(connectorCaptor.getValue().getStationId()).isEqualTo("CP-2X");
     assertThat(connectorCaptor.getValue().getEvseId()).isEqualTo(4);
     assertThat(connectorCaptor.getValue().getConnectorId()).isEqualTo(7);
+  }
+
+  @Test
+  void usesPayloadTimestampAndPreservesOptionalConnectorFieldsOnPartialUpdate() {
+    ChargingConnectorState existing =
+        new ChargingConnectorState(
+            "CP-TS",
+            3,
+            1,
+            "AVAILABLE",
+            "TYPE2",
+            "OPERATIVE",
+            Instant.parse("2026-03-30T10:00:00Z"));
+    when(connectorStateRepository.findByStationIdAndEvseIdAndConnectorId("CP-TS", 3, 1))
+        .thenReturn(Optional.of(existing));
+    when(connectorStateRepository.save(any(ChargingConnectorState.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(connectorStateRepository.findByStationIdOrderByEvseIdAscConnectorIdAsc("CP-TS"))
+        .thenReturn(List.of(existing));
+
+    when(chargingStationRepository.findByStationId("CP-TS")).thenReturn(Optional.empty());
+    when(chargingStationRepository.save(any(ChargingStation.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    OcppMessage incoming =
+        new OcppMessage(
+            "2",
+            "msg-3",
+            "StatusNotification",
+            Map.of(
+                "stationId", "CP-TS",
+                "status", "Preparing",
+                "evseId", 3,
+                "connectorId", 1,
+                "timestamp", "2026-03-30T10:15:00Z"));
+
+    bridgeService.handleIncoming("session-3", incoming);
+
+    ArgumentCaptor<ChargingConnectorState> connectorCaptor =
+        ArgumentCaptor.forClass(ChargingConnectorState.class);
+    verify(connectorStateRepository).save(connectorCaptor.capture());
+
+    assertThat(connectorCaptor.getValue().getLastStatusAt())
+        .isEqualTo(Instant.parse("2026-03-30T10:15:00Z"));
+    assertThat(connectorCaptor.getValue().getConnectorType()).isEqualTo("TYPE2");
+    assertThat(connectorCaptor.getValue().getAvailability()).isEqualTo("OPERATIVE");
   }
 }

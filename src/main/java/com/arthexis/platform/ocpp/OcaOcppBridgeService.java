@@ -61,14 +61,16 @@ public class OcaOcppBridgeService {
                 payload.getOrDefault("status", payload.getOrDefault("connectorStatus", "UNKNOWN")));
         int evseId = resolveEvseId(payload);
         int connectorId = resolveConnectorId(payload);
+        Instant reportedAt = resolveReportedAt(payload);
         connectorStateService.upsertConnectorState(
             stationId,
             evseId,
             connectorId,
             connectorStatus,
-            stringValue(payload.get("connectorType")),
-            stringValue(payload.getOrDefault("availability", payload.get("connectorAvailability"))),
-            Instant.now());
+            optionalStringValue(payload.get("connectorType")),
+            optionalStringValue(
+                payload.getOrDefault("availability", payload.get("connectorAvailability"))),
+            reportedAt);
 
         String aggregateStatus =
             connectorStateService.deriveStationAggregateStatus(stationId, connectorStatus);
@@ -191,8 +193,33 @@ public class OcaOcppBridgeService {
   private String nullIfBlank(String value) {
     return (value == null || value.isBlank()) ? null : value;
   }
+
+  private Instant resolveReportedAt(Map<String, Object> payload) {
+    Object timestamp = payload.get("timestamp");
+    if (timestamp == null) {
+      return Instant.now();
+    }
+    if (timestamp instanceof Number number) {
+      return Instant.ofEpochMilli(number.longValue());
+    }
+    String value = timestamp.toString();
+    try {
+      return Instant.parse(value);
+    } catch (RuntimeException ex) {
+      return Instant.now();
+    }
+  }
+
   private String stringValue(Object value) {
     return value == null ? "" : value.toString();
+  }
+
+  private String optionalStringValue(Object value) {
+    if (value == null) {
+      return null;
+    }
+    String text = value.toString();
+    return text.isBlank() ? null : text;
   }
 
 
