@@ -125,4 +125,48 @@ class OcppCommandDispatchServiceTests {
 
     verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
   }
+
+  @Test
+  void allowsInitialDispatchWhenMaxRetriesIsZero() {
+    OcppCommandDispatchProperties properties = new OcppCommandDispatchProperties();
+    properties.setAckTimeout(Duration.ofSeconds(45));
+    properties.setRetryDelay(Duration.ofSeconds(1));
+    properties.setMaxRetries(0);
+
+    OcppCommandDispatchService zeroRetryService =
+        new OcppCommandDispatchService(
+            commandRepository,
+            sessionRouter,
+            stateStore,
+            properties,
+            new ObjectMapper(),
+            eventPublisher);
+
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = zeroRetryService.submit(request, "admin");
+
+    assertThat(result.commandId()).isNotNull();
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
+  }
+
+  @Test
+  void failsCommandImmediatelyWhenPayloadJsonIsInvalid() {
+    OcppCommandRecord command =
+        new OcppCommandRecord("CP-16", "EVSE", "Reset", "{bad json", "admin", 3);
+    command.markQueued(Instant.now(), Instant.now());
+
+    when(commandRepository.findByStatusInAndNextAttemptAtLessThanEqual(
+            eq(List.of(OcppCommandStatus.QUEUED, OcppCommandStatus.SENT)), any()))
+        .thenReturn(List.of(command));
+
+    service.processQueue();
+
+    assertThat(command.getStatus()).isEqualTo(OcppCommandStatus.FAILED);
+    assertThat(command.getFailureReason()).isEqualTo("Invalid command payload JSON");
+    verify(commandRepository).save(command);
+  }
 }

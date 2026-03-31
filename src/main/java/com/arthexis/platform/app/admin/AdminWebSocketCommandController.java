@@ -24,17 +24,15 @@ public class AdminWebSocketCommandController {
   public void relay(@Payload AdminCommandRequest command, Principal principal) {
     String user = principal == null ? "unknown" : principal.getName();
     AdminCommandResult result = commandGateway.submit(command, user);
+    java.util.HashMap<String, Object> details = new java.util.HashMap<>();
+    details.put("commandId", result.commandId());
+    details.put("component", result.component());
+    details.put("action", result.action());
+    details.put("status", result.status());
+    details.put("message", result.message());
     messagingTemplate.convertAndSend(
         AdminWebSocketDomainEventBridge.ADMIN_TOPIC_EVENTS,
         new AdminRealtimePayload(
-            "admin.command.result",
-            result.stationId(),
-            result.occurredAt(),
-            java.util.Map.of(
-                "commandId", result.commandId(),
-                "component", result.component(),
-                "action", result.action(),
-                "status", result.status(),
-                "message", result.message())));
+            "admin.command.result", result.stationId(), result.occurredAt(), details));
   }
 }

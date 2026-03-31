@@ -90,7 +90,7 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
             request.action().trim(),
             toJson(request.payload() == null ? Map.of() : request.payload()),
             user,
-            properties.getMaxRetries());
+            Math.max(1, properties.getMaxRetries() + 1));
 
     Instant now = Instant.now();
     command.markQueued(now, now);
@@ -168,13 +168,17 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
 
     String messageId = UUID.randomUUID().toString();
     try {
-      OcppMessage outbound =
-          new OcppMessage("CALL", messageId, command.getAction(), objectMapper.readValue(command.getPayloadJson(), Map.class));
+      Map payload = objectMapper.readValue(command.getPayloadJson(), Map.class);
+      OcppMessage outbound = new OcppMessage("CALL", messageId, command.getAction(), payload);
       sessionRouter.sendToStation(command.getStationId(), outbound);
       command.markSent(messageId, now, now.plus(properties.getAckTimeout()));
       commandRepository.save(command);
       stateStore.storePendingCommand(command.getStationId(), command.getCommandId(), commandKey(command));
       publishFromRecord(command, "Command dispatched to station websocket session");
+    } catch (JsonProcessingException ex) {
+      command.markFailed(now, "Invalid command payload JSON");
+      commandRepository.save(command);
+      publishFromRecord(command, command.getFailureReason());
     } catch (IOException ex) {
       command.markQueued(now, now.plus(properties.getRetryDelay()));
       commandRepository.save(command);
