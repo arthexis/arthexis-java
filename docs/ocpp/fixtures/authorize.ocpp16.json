@@ -1,0 +1,21 @@
+{
+  "name": "authorize_ocpp16_id_tag",
+  "action": "Authorize",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-auth-16",
+  "payload": {
+    "stationId": "CP-16-AUTH",
+    "idTag": "A1B2C3"
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-AUTH",
+    "normalized": {
+      "stationId": "CP-16-AUTH",
+      "idTag": "A1B2C3"
+    },
+    "types": {
+      "stationId": "string",
+      "idTag": "string"
+    }
+  }
+}

@@ -88,6 +88,49 @@ public class OcaOcppBridgeService {
         }
         yield response(stationId, accepted());
       }
+      case "Authorize" -> {
+        payloadNormalizer.normalizeAuthorize(stationId, payload);
+        yield response(stationId, Map.of("idTagInfo", Map.of("status", "Accepted")));
+      }
+      case "DiagnosticsStatusNotification" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeDiagnosticsStatus(stationId, payload);
+        Map<String, Object> adminPayload = Map.of();
+        if (normalized.containsKey("status")) {
+          adminPayload = Map.of("diagnosticsStatus", normalized.get("status"));
+        }
+        chargingStationService.upsertStatus(
+            stationId,
+            "ONLINE",
+            buildAdminDetails(adminPayload, false));
+        yield response(stationId, accepted());
+      }
+      case "FirmwareStatusNotification" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeFirmwareStatus(stationId, payload);
+        Map<String, Object> adminPayload = Map.of();
+        if (normalized.containsKey("status")) {
+          adminPayload = Map.of("firmwareVersion", normalized.get("status"));
+        }
+        chargingStationService.upsertStatus(
+            stationId,
+            "ONLINE",
+            buildAdminDetails(adminPayload, false));
+        yield response(stationId, accepted());
+      }
+      case "AvailabilityStatusNotification" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeAvailabilityStatus(stationId, payload);
+        int evseId = intValue(normalized.get("evseId"), 1);
+        int connectorId = intValue(normalized.get("connectorId"), 1);
+        String availabilityStatus = stringValue(normalized.getOrDefault("status", "Operative"));
+        connectorStateService.upsertConnectorState(
+            stationId,
+            evseId,
+            connectorId,
+            availabilityStatus,
+            "",
+            availabilityStatus,
+            Instant.now());
+        yield response(stationId, accepted());
+      }
       default -> response(stationId, accepted());
     };
   }

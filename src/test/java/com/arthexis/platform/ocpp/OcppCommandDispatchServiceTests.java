@@ -13,9 +13,11 @@ import com.arthexis.platform.app.admin.AdminCommandStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -78,6 +80,36 @@ class OcppCommandDispatchServiceTests {
 
     assertThat(result.status()).isEqualTo(AdminCommandStatus.FAILED);
     verify(commandRepository, never()).save(any());
+  }
+
+  @Test
+  void supportsCustomProfileCapabilitiesFromProperties() {
+    OcppCommandDispatchProperties properties = new OcppCommandDispatchProperties();
+    properties.setAckTimeout(Duration.ofSeconds(45));
+    properties.setRetryDelay(Duration.ofSeconds(1));
+    properties.setMaxRetries(1);
+    Map<String, Set<String>> custom = new LinkedHashMap<>();
+    custom.put("new-profile", Set.of("TriggerMessage"));
+    properties.setProfileCapabilities(custom);
+
+    OcppCommandDispatchService profileAwareService =
+        new OcppCommandDispatchService(
+            commandRepository,
+            sessionRouter,
+            stateStore,
+            properties,
+            new ObjectMapper(),
+            eventPublisher);
+
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-77", "EVSE", "TriggerMessage", "new-profile", Map.of());
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = profileAwareService.submit(request, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
   }
 
   @Test

@@ -1,0 +1,26 @@
+{
+  "name": "firmware_status_ocpp2x_updating",
+  "action": "FirmwareStatusNotification",
+  "ocppVariant": "2.x",
+  "sessionId": "session-fw-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X-FW"
+    },
+    "firmwareStatus": "Downloading",
+    "requestId": "req-88"
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X-FW",
+    "normalized": {
+      "stationId": "CP-2X-FW",
+      "status": "Downloading",
+      "requestId": "req-88"
+    },
+    "types": {
+      "stationId": "string",
+      "status": "string",
+      "requestId": "string"
+    }
+  }
+}
