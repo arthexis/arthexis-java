@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +31,7 @@ class OcaOcppBridgeStatusNotificationTests {
   @Mock private ChargingStationRepository chargingStationRepository;
   @Mock private ChargingConnectorStateRepository connectorStateRepository;
   @Mock private TelemetrySampleRepository telemetrySampleRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private OcaOcppBridgeService bridgeService;
 
@@ -37,10 +39,10 @@ class OcaOcppBridgeStatusNotificationTests {
   void setUp() {
     bridgeService =
         new OcaOcppBridgeService(
-            new ChargingStationService(chargingStationRepository),
+            new ChargingStationService(chargingStationRepository, eventPublisher),
             new ChargingConnectorStateService(connectorStateRepository),
             new OcppSessionStateStore(new StringRedisTemplate()),
-            new TelemetryIngestionService(telemetrySampleRepository),
+            new TelemetryIngestionService(telemetrySampleRepository, eventPublisher),
             new OcaOcppPayloadNormalizer());
   }
 
