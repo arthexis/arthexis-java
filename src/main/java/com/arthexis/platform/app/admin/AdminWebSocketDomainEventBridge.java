@@ -1,5 +1,6 @@
 package com.arthexis.platform.app.admin;
 
+import com.arthexis.platform.telemetry.TelemetrySummaryEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.context.event.EventListener;
