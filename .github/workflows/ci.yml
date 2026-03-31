@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,7 +11,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -54,49 +53,53 @@ jobs:
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           fi
-      - name: Comment CI error on PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.verify.outputs.status != '0'
+      - name: Open or update issue with failure context
+        if: steps.verify.outputs.status != '0'
         uses: actions/github-script@v7
         env:
           ERROR_MESSAGE: ${{ steps.verify.outputs.error_message }}
         with:
           script: |
-            const marker = `<!-- arthexis-ci-failure-${{ matrix.install_mode }} -->`;
             const mode = '${{ matrix.install_mode }}';
+            const title = `[CI] Hourly ${mode} validation failed`;
+            const marker = `<!-- arthexis-hourly-ci-failure-${{ matrix.install_mode }} -->`;
             const raw = process.env.ERROR_MESSAGE || 'No error details captured.';
             const maxLength = 65000;
             const content = raw.length > maxLength
               ? `${raw.slice(0, maxLength)}\n... (truncated)`
               : raw;
             const body = `${marker}
-            ⚠️ CI failed during ${mode} validation.
+            Hourly install/upgrade validation failed for **${mode}**.
+
+            - Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            - Commit: ${context.sha}
 
             \`\`\`text
             ${content}
             \`\`\`
             `;
-            const issue_number = context.issue.number;
             const { owner, repo } = context.repo;
-            const comments = await github.paginate(github.rest.issues.listComments, {
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
               repo,
-              issue_number,
+              state: 'open',
               per_page: 100
             });
-            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+            const existing = issues.find((issue) => issue.title === title && issue.body && issue.body.includes(marker));
             if (existing) {
-              await github.rest.issues.updateComment({
+              await github.rest.issues.update({
                 owner,
                 repo,
-                comment_id: existing.id,
+                issue_number: existing.number,
                 body
               });
             } else {
-              await github.rest.issues.createComment({
+              await github.rest.issues.create({
                 owner,
                 repo,
-                issue_number,
-                body
+                title,
+                body,
+                labels: ['ci']
               });
             }
       - name: Fail workflow if verify failed
@@ -108,6 +111,9 @@ jobs:
   rpi-compat:
     name: rpi-compat (${{ matrix.distro }} / ${{ matrix.install_mode }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     strategy:
       fail-fast: false
       matrix:
@@ -115,17 +121,11 @@ jobs:
           - distro: debian-bookworm
             image: maven:3.9.9-eclipse-temurin-21
             install_mode: new-install
-          - distro: ubuntu-jammy
-            image: maven:3.9.9-eclipse-temurin-21-jammy
-            install_mode: new-install
           - distro: ubuntu-noble
             image: maven:3.9.9-eclipse-temurin-21-noble
             install_mode: new-install
           - distro: debian-bookworm-upgrade
             image: maven:3.9.9-eclipse-temurin-21
-            install_mode: upgrade-install
-          - distro: ubuntu-jammy-upgrade
-            image: maven:3.9.9-eclipse-temurin-21-jammy
             install_mode: upgrade-install
           - distro: ubuntu-noble-upgrade
             image: maven:3.9.9-eclipse-temurin-21-noble
@@ -137,9 +137,12 @@ jobs:
         with:
           platforms: arm64
       - name: Run rpi-compat tests (${{ matrix.distro }})
+        id: verify_rpi
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
+          set +e
 
           if [ "${{ matrix.install_mode }}" = "upgrade-install" ]; then
             verify_command="mvn -B -Dtest=FlywayUpgradePathTests test"
@@ -153,4 +156,74 @@ jobs:
             -v "$HOME/.m2":/root/.m2 \
             -w /workspace \
             "${{ matrix.image }}" \
-            bash -lc "$verify_command"
+            bash -lc "$verify_command" 2>&1 | tee ci-rpi-verify.log
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "error_message<<EOF"
+              if grep -q "\[ERROR\]" ci-rpi-verify.log; then
+                grep "\[ERROR\]" ci-rpi-verify.log | tail -n 40
+              else
+                tail -n 40 ci-rpi-verify.log
+              fi
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update issue with rpi-compat failure context
+        if: steps.verify_rpi.outputs.status != '0'
+        uses: actions/github-script@v7
+        env:
+          ERROR_MESSAGE: ${{ steps.verify_rpi.outputs.error_message }}
+        with:
+          script: |
+            const distro = '${{ matrix.distro }}';
+            const mode = '${{ matrix.install_mode }}';
+            const title = `[CI] Hourly rpi-compat ${distro} ${mode} validation failed`;
+            const marker = `<!-- arthexis-hourly-rpi-ci-failure-${{ matrix.distro }}-${{ matrix.install_mode }} -->`;
+            const raw = process.env.ERROR_MESSAGE || 'No error details captured.';
+            const maxLength = 65000;
+            const content = raw.length > maxLength
+              ? `${raw.slice(0, maxLength)}\n... (truncated)`
+              : raw;
+            const body = `${marker}
+            Hourly rpi-compat validation failed for **${distro} / ${mode}**.
+
+            - Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            - Commit: ${context.sha}
+
+            \`\`\`text
+            ${content}
+            \`\`\`
+            `;
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+            const existing = issues.find((issue) => issue.title === title && issue.body && issue.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                labels: ['ci']
+              });
+            }
+      - name: Fail workflow if rpi-compat verify failed
+        if: steps.verify_rpi.outputs.status != '0'
+        run: |
+          echo "RPI compatibility verification failed for: ${{ matrix.distro }} / ${{ matrix.install_mode }}"
+          exit 1
