@@ -1,5 +1,6 @@
 package com.arthexis.platform.config;
 
+import com.arthexis.platform.security.mfa.MfaSessionService;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -11,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -24,7 +26,10 @@ public class AdminWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
-    registry.addEndpoint("/ws/admin").setAllowedOriginPatterns("*");
+    registry
+        .addEndpoint("/ws/admin")
+        .setAllowedOriginPatterns("*")
+        .addInterceptors(new HttpSessionHandshakeInterceptor());
   }
 
   @Override
@@ -53,6 +58,9 @@ public class AdminWebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 || "ROLE_OPERATOR".equals(grantedAuthority.getAuthority()));
             if (!authorized) {
               throw new SecurityException("Admin or operator role required for admin websocket channel");
+            }
+            if (!Boolean.TRUE.equals(accessor.getSessionAttributes().get(MfaSessionService.MFA_VERIFIED))) {
+              throw new SecurityException("Second factor verification required for admin websocket channel");
             }
             return message;
           }
