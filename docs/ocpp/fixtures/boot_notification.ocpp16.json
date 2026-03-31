@@ -1,0 +1,14 @@
+{
+  "name": "boot_notification_ocpp16_station_id",
+  "action": "BootNotification",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-boot-16",
+  "payload": {
+    "stationId": "CP-16-BOOT",
+    "chargePointVendor": "Arthexis",
+    "chargePointModel": "AX-16"
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-BOOT"
+  }
+}

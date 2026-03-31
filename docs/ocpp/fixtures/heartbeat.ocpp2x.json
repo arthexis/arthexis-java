@@ -1,0 +1,15 @@
+{
+  "name": "heartbeat_ocpp2x_serial_number",
+  "action": "Heartbeat",
+  "ocppVariant": "2.x",
+  "sessionId": "session-heartbeat-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X-HB",
+      "model": "AX-200"
+    }
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X-HB"
+  }
+}

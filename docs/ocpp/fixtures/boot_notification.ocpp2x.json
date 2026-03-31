@@ -1,0 +1,16 @@
+{
+  "name": "boot_notification_ocpp2x_serial_number",
+  "action": "BootNotification",
+  "ocppVariant": "2.x",
+  "sessionId": "session-boot-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X-BOOT",
+      "model": "AX-200"
+    },
+    "reason": "PowerUp"
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X-BOOT"
+  }
+}

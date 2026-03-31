@@ -1,0 +1,14 @@
+{
+  "name": "status_notification_ocpp2x_session_fallback",
+  "action": "StatusNotification",
+  "ocppVariant": "2.x",
+  "sessionId": "session-status-2x",
+  "payload": {
+    "connectorStatus": "Occupied",
+    "evseId": 1,
+    "connectorId": 1
+  },
+  "expected": {
+    "resolvedStationId": "session-status-2x"
+  }
+}
