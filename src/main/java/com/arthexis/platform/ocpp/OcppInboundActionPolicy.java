@@ -38,7 +38,11 @@ public final class OcppInboundActionPolicy {
           PROFILE_PYTHON_OCPP16,
           Set.of("TransactionEvent", "AvailabilityStatusNotification"),
           PROFILE_PYTHON_OCPP2X,
-          Set.of("StartTransaction", "StopTransaction", "DiagnosticsStatusNotification", "FirmwareStatusNotification"));
+          Set.of(
+              "StartTransaction",
+              "StopTransaction",
+              "DiagnosticsStatusNotification",
+              "FirmwareStatusNotification"));
 
   private static final Map<String, Set<String>> IGNORED_ACTIONS =
       Map.of(

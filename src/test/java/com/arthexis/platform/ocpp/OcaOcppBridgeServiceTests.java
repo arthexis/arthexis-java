@@ -2,6 +2,7 @@ package com.arthexis.platform.ocpp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -226,6 +227,9 @@ class OcaOcppBridgeServiceTests {
 
   @Test
   void startTransactionCompatibilityMarksStationChargingAndReturnsTransactionId() {
+    when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+        .thenReturn(new AuthorizationDecision(true, "Accepted", "RFID", "acct-16", null, "ok"));
+
     OcppBridgeResponse response =
         bridgeService.handleIncoming(
             "session-16",
@@ -238,6 +242,25 @@ class OcaOcppBridgeServiceTests {
     verify(chargingStationService).upsertStatus("CP-16", "CHARGING");
     assertThat(response.payload()).containsEntry("idTagInfo", Map.of("status", "Accepted"));
     assertThat(response.payload()).containsKey("transactionId");
+  }
+
+  @Test
+  void startTransactionCompatibilityReturnsDeniedStatusWhenAuthorizationFails() {
+    when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+        .thenReturn(
+            new AuthorizationDecision(false, "Blocked", "ACCOUNT_LOGIN", "acct-16", null, "blocked"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-16",
+            new OcppMessage(
+                "2",
+                "msg-start-16-denied",
+                "StartTransaction",
+                Map.of("stationId", "CP-16", "idTag", "CARD-16", "connectorId", 1)));
+
+    verify(chargingStationService, never()).upsertStatus("CP-16", "CHARGING");
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Blocked")));
   }
 
   @Test
@@ -266,7 +289,29 @@ class OcaOcppBridgeServiceTests {
                 "SecurityEventNotification",
                 Map.of("chargingStation", Map.of("serialNumber", "CP-2X"), "type", "Tamper")));
 
-    verify(chargingStationService).upsertStatus(any(), any(), any());
+    verify(chargingStationService, never()).upsertStatus(any(), any(), any());
+    assertThat(response.resultStatus()).isEqualTo("unsupported-but-accepted");
+    assertThat(response.payload())
+        .containsEntry("status", "Accepted")
+        .containsEntry("customData", Map.of("handling", "no-op", "auditStatus", "unsupported-but-accepted"));
+  }
+
+  @Test
+  void notifyEventReturnsExplicitNoOpPayloadWithoutStatusMutation() {
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-2x",
+            new OcppMessage(
+                "2",
+                "msg-notify-2x",
+                "NotifyEvent",
+                Map.of(
+                    "chargingStation",
+                    Map.of("serialNumber", "CP-2X"),
+                    "eventData",
+                    List.of(Map.of("eventId", 1)))));
+
+    verify(chargingStationService, never()).upsertStatus(any(), any(), any());
     assertThat(response.resultStatus()).isEqualTo("unsupported-but-accepted");
     assertThat(response.payload())
         .containsEntry("status", "Accepted")
@@ -292,6 +337,10 @@ class OcaOcppBridgeServiceTests {
     Map<String, Object> fixture = readFixture(fixtureFile);
     Map<String, Object> payload = mapValue(fixture.get("payload"));
     Map<String, Object> expected = mapValue(fixture.get("expected"));
+    if ("StartTransaction".equals(stringValue(fixture.get("action")))) {
+      when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+          .thenReturn(new AuthorizationDecision(true, "Accepted", "RFID", "acct-16", null, "ok"));
+    }
 
     OcppBridgeResponse response =
         bridgeService.handleIncoming(

@@ -7,8 +7,10 @@ import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -102,6 +104,11 @@ public class OcaOcppBridgeService {
         yield response(stationId, accepted());
       }
       case "StartTransaction" -> {
+        String cardUid = resolveCardUid(payload);
+        AuthorizationDecision decision = rfidAuthorizationService.authorize(stationId, cardUid);
+        if (!"Accepted".equals(decision.ocppStatus())) {
+          yield response(stationId, Map.of("idTagInfo", Map.of("status", decision.ocppStatus())));
+        }
         chargingStationService.upsertStatus(stationId, "CHARGING");
         yield response(
             stationId,
@@ -139,11 +146,9 @@ public class OcaOcppBridgeService {
         yield response(stationId, accepted());
       }
       case "SecurityEventNotification" -> {
-        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, acceptedNoOp(), "unsupported-but-accepted");
       }
       case "NotifyEvent" -> {
-        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, acceptedNoOp(), "unsupported-but-accepted");
       }
       default -> {
@@ -357,18 +362,20 @@ public class OcaOcppBridgeService {
     return OcppInboundActionPolicy.PROFILE_PYTHON_OCPP16;
   }
 
-  private int resolveTransactionId(Map<String, Object> payload, String messageId) {
+  private long resolveTransactionId(Map<String, Object> payload, String messageId) {
     Object tx = payload.get("transactionId");
     if (tx instanceof Number number) {
-      return number.intValue();
+      return number.longValue();
     }
     if (tx != null) {
       try {
-        return Integer.parseInt(tx.toString());
+        return Long.parseLong(tx.toString());
       } catch (NumberFormatException ignored) {
-        // Fall through to deterministic message-based id generation.
+        // Fall through to generated id.
       }
     }
-    return Math.abs((messageId == null ? "" : messageId).hashCode());
+    String seed = messageId == null ? "" : messageId;
+    return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).getMostSignificantBits()
+        & Long.MAX_VALUE;
   }
 }
