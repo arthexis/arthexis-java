@@ -1,8 +1,8 @@
 package com.arthexis.platform.simulator;
 
 import com.arthexis.platform.ocpp.OcppMessage;
+import com.arthexis.platform.ocpp.OcppFrameCodec;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -30,17 +30,17 @@ public class OcppChargePointSimulator {
 
   private final WebSocketClient webSocketClient;
   private final OcppSimulatorProperties properties;
-  private final ObjectMapper objectMapper;
+  private final OcppFrameCodec frameCodec;
 
   private final AtomicReference<WebSocketSession> session = new AtomicReference<>();
   private final AtomicBoolean bootSent = new AtomicBoolean(false);
   private final AtomicBoolean connectionAttemptInFlight = new AtomicBoolean(false);
 
   public OcppChargePointSimulator(
-      WebSocketClient webSocketClient, OcppSimulatorProperties properties, ObjectMapper objectMapper) {
+      WebSocketClient webSocketClient, OcppSimulatorProperties properties, OcppFrameCodec frameCodec) {
     this.webSocketClient = webSocketClient;
     this.properties = properties;
-    this.objectMapper = objectMapper;
+    this.frameCodec = frameCodec;
   }
 
   @Scheduled(
@@ -95,7 +95,7 @@ public class OcppChargePointSimulator {
       @Override
       protected void handleTextMessage(WebSocketSession webSocketSession, TextMessage message)
           throws IOException {
-        OcppMessage response = objectMapper.readValue(message.getPayload(), OcppMessage.class);
+        OcppMessage response = frameCodec.decode(message.getPayload());
         log.debug(
             "OCPP simulator received {} for action {}", response.messageType(), response.action());
       }
@@ -135,7 +135,7 @@ public class OcppChargePointSimulator {
   private void sendCall(WebSocketSession current, String action, Map<String, Object> payload) {
     OcppMessage message = new OcppMessage("CALL", UUID.randomUUID().toString(), action, payload);
     try {
-      current.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
+      current.sendMessage(new TextMessage(frameCodec.encode(message)));
       log.debug("OCPP simulator sent {} as {}", action, properties.getChargePointId());
     } catch (JsonProcessingException ex) {
       log.warn("OCPP simulator could not serialize {}: {}", action, ex.getMessage());

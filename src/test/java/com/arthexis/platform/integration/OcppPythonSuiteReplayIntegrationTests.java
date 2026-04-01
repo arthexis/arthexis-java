@@ -14,6 +14,7 @@ import com.arthexis.platform.ocpp.OcppMessage;
 import com.arthexis.platform.ocpp.OcppMessageRecordRepository;
 import com.arthexis.platform.ocpp.OcppCommandDispatchProperties;
 import com.arthexis.platform.ocpp.OcppCommandDispatchService;
+import com.arthexis.platform.ocpp.OcppFrameCodec;
 import com.arthexis.platform.ocpp.OcppCommandRecordRepository;
 import com.arthexis.platform.ocpp.OcppOutboundSessionRouter;
 import com.arthexis.platform.ocpp.OcppSessionAuditService;
@@ -61,11 +62,13 @@ class OcppPythonSuiteReplayIntegrationTests {
 
   private OcppWebSocketHandler webSocketHandler;
   private ObjectMapper objectMapper;
+  private OcppFrameCodec frameCodec;
 
   @BeforeEach
   void setUp() {
     ApplicationEventPublisher noOpEvents = event -> {};
     objectMapper = new ObjectMapper();
+    frameCodec = new OcppFrameCodec(objectMapper);
     OcaOcppBridgeService bridgeService =
         new OcaOcppBridgeService(
             new ChargingStationService(chargingStationRepository, noOpEvents),
@@ -94,7 +97,7 @@ class OcppPythonSuiteReplayIntegrationTests {
     OcppCommandDispatchService commandDispatchService =
         new OcppCommandDispatchService(
             commandRecordRepository,
-            new OcppOutboundSessionRouter(objectMapper),
+            new OcppOutboundSessionRouter(frameCodec),
             noOpStateStore,
             new OcppCommandDispatchProperties(),
             objectMapper,
@@ -102,11 +105,11 @@ class OcppPythonSuiteReplayIntegrationTests {
 
     webSocketHandler =
         new OcppWebSocketHandler(
-            objectMapper,
+            frameCodec,
             bridgeService,
             sessionAuditService,
             commandDispatchService,
-            new OcppOutboundSessionRouter(objectMapper),
+            new OcppOutboundSessionRouter(frameCodec),
             noOpStateStore);
   }
 
@@ -179,10 +182,10 @@ class OcppPythonSuiteReplayIntegrationTests {
                 "2026-03-31T10:15:00Z")));
 
     assertThat(session.acknowledgements).hasSize(4);
-    assertAckAccepted(session.acknowledgements.get(0), "boot-001", "BootNotification");
-    assertAckAccepted(session.acknowledgements.get(1), "status-001", "StatusNotification");
-    assertAckAccepted(session.acknowledgements.get(2), "txn-start-001", "TransactionEvent");
-    assertAckAccepted(session.acknowledgements.get(3), "txn-end-001", "TransactionEvent");
+    assertAckAccepted(session.acknowledgements.get(0), "boot-001");
+    assertAckAccepted(session.acknowledgements.get(1), "status-001");
+    assertAckAccepted(session.acknowledgements.get(2), "txn-start-001");
+    assertAckAccepted(session.acknowledgements.get(3), "txn-end-001");
 
     ChargingStation station = chargingStationRepository.findByStationId("CP-PY-001").orElseThrow();
     assertThat(station.getStatus()).isEqualTo("AVAILABLE");
@@ -212,14 +215,14 @@ class OcppPythonSuiteReplayIntegrationTests {
   }
 
   private void replayMessage(WebSocketSession session, OcppMessage message) throws Exception {
-    webSocketHandler.handleMessage(session, new TextMessage(objectMapper.writeValueAsString(message)));
+    webSocketHandler.handleMessage(session, new TextMessage(frameCodec.encode(message)));
   }
 
   @SuppressWarnings("unchecked")
-  private void assertAckAccepted(OcppMessage ack, String expectedMessageId, String expectedAction) {
+  private void assertAckAccepted(OcppMessage ack, String expectedMessageId) {
     assertThat(ack.messageType()).isEqualTo("CALLRESULT");
     assertThat(ack.messageId()).isEqualTo(expectedMessageId);
-    assertThat(ack.action()).isEqualTo(expectedAction);
+    assertThat(ack.action()).isNull();
     Map<String, Object> payload = (Map<String, Object>) ack.payload();
     assertThat(payload).containsEntry("status", "Accepted");
   }
@@ -241,7 +244,7 @@ class OcppPythonSuiteReplayIntegrationTests {
     @Override
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
       if (message instanceof TextMessage textMessage) {
-        acknowledgements.add(objectMapper.readValue(textMessage.getPayload(), OcppMessage.class));
+        acknowledgements.add(frameCodec.decode(textMessage.getPayload()));
       } else {
         throw new IllegalArgumentException("Unexpected message type: " + message.getClass());
       }

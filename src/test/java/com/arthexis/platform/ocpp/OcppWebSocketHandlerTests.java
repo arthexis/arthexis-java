@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import org.springframework.web.socket.WebSocketSession;
 class OcppWebSocketHandlerTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  private final OcppFrameCodec frameCodec = new OcppFrameCodec(objectMapper);
 
   @Mock private OcaOcppBridgeService bridgeService;
   @Mock private OcppSessionAuditService auditService;
@@ -35,7 +38,7 @@ class OcppWebSocketHandlerTests {
   void setUp() {
     handler =
         new OcppWebSocketHandler(
-            objectMapper,
+            frameCodec,
             bridgeService,
             auditService,
             commandDispatchService,
@@ -46,15 +49,21 @@ class OcppWebSocketHandlerTests {
 
   @Test
   void routesCallErrorToCommandFailureAndAudit() throws Exception {
+    String payload =
+        """
+        [4,"msg-123","ProtocolError","Rejected by charger",{"vendorCode":"X1"}]
+        """;
+
+    handler.handleTextMessage(session, new TextMessage(payload));
     OcppMessage callError =
         new OcppMessage(
             "CALLERROR",
             "msg-123",
-            "Reset",
-            Map.of("errorCode", "ProtocolError", "errorDescription", "Rejected by charger"));
-    String payload = objectMapper.writeValueAsString(callError);
-
-    handler.handleTextMessage(session, new TextMessage(payload));
+            null,
+            Map.of(
+                "errorCode", "ProtocolError",
+                "errorDescription", "Rejected by charger",
+                "errorDetails", Map.of("vendorCode", "X1")));
 
     verify(commandDispatchService)
         .failByMessageId(
@@ -71,6 +80,42 @@ class OcppWebSocketHandlerTests {
             argThat(
                 reason ->
                     reason.contains("ProtocolError") && reason.contains("Rejected by charger")));
-    verify(bridgeService, never()).handleIncoming("session-1", callError);
+    verify(bridgeService, never()).handleIncoming(eq("session-1"), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void rejectsUnknownMessageTypeId() {
+    String payload = "[9,\"msg-unknown\",\"Ignored\",{}]";
+
+    assertThatThrownBy(() -> handler.handleTextMessage(session, new TextMessage(payload)))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("Unknown OCPP message type id");
+
+    verify(auditService).recordIncomingParseFailure("session-1", payload);
+    verify(bridgeService, never()).handleIncoming(eq("session-1"), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void rejectsMalformedCallLength() {
+    String payload = "[2,\"msg-short\",\"Heartbeat\"]";
+
+    assertThatThrownBy(() -> handler.handleTextMessage(session, new TextMessage(payload)))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("CALL frame must have 4 elements");
+
+    verify(auditService).recordIncomingParseFailure("session-1", payload);
+    verify(bridgeService, never()).handleIncoming(eq("session-1"), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void rejectsInvalidCallFieldTypes() {
+    String payload = "[2,123,\"Heartbeat\",{}]";
+
+    assertThatThrownBy(() -> handler.handleTextMessage(session, new TextMessage(payload)))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("CALL uniqueId must be a string");
+
+    verify(auditService).recordIncomingParseFailure("session-1", payload);
+    verify(bridgeService, never()).handleIncoming(eq("session-1"), org.mockito.ArgumentMatchers.any());
   }
 }
