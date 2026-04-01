@@ -74,4 +74,53 @@ class OcppFtpUrlFactoryTests {
         .isEqualTo(
             "ftp://north%40ops:p%3Aas%2Fs@ftp.arthexis.local:2211/cp-ny-01/firmware/arthexis-1.2.3.bin");
   }
+
+  @Test
+  void encodesSpecialCharactersInPath() {
+    OcppFtpServerProperties properties = new OcppFtpServerProperties();
+    properties.setPublicHost("ftp.arthexis.local");
+    properties.setPort(2211);
+
+    OcppFtpServerProperties.Binding binding = new OcppFtpServerProperties.Binding();
+    binding.setId("north-yard");
+    binding.setUsername("north");
+    binding.setPassword("pw");
+    binding.setChargerIds(List.of("cp-ny-01"));
+    properties.setBindings(List.of(binding));
+
+    OcppFtpBindingRegistry registry = new OcppFtpBindingRegistry(properties);
+    registry.initialize();
+
+    OcppFtpUrlFactory factory = new OcppFtpUrlFactory(properties, registry);
+    URI url = factory.buildDownloadUrl("cp-ny-01", "firmware/file ?.bin");
+
+    assertThat(url.toASCIIString())
+        .isEqualTo("ftp://north:pw@ftp.arthexis.local:2211/cp-ny-01/firmware/file%20%3F.bin");
+  }
+
+  @Test
+  void formatsIpv6HostInAuthority() {
+    OcppFtpServerProperties properties = new OcppFtpServerProperties();
+    properties.setPublicHost("2001:db8::1");
+    properties.setPort(2211);
+
+    OcppFtpServerProperties.Binding binding = new OcppFtpServerProperties.Binding();
+    binding.setId("north-yard");
+    binding.setUsername("north");
+    binding.setPassword("pw");
+    binding.setChargerIds(List.of("cp-ny-01"));
+    properties.setBindings(List.of(binding));
+
+    OcppFtpBindingRegistry registry = new OcppFtpBindingRegistry(properties);
+    registry.initialize();
+
+    OcppFtpUrlFactory factory = new OcppFtpUrlFactory(properties, registry);
+    URI url = factory.buildDownloadUrl("cp-ny-01", "firmware/arthexis-1.2.3.bin");
+
+    assertThat(url.getHost()).isEqualTo("[2001:db8::1]");
+    assertThat(url.getPort()).isEqualTo(2211);
+    assertThat(url.toASCIIString())
+        .isEqualTo(
+            "ftp://north:pw@[2001:db8::1]:2211/cp-ny-01/firmware/arthexis-1.2.3.bin");
+  }
 }

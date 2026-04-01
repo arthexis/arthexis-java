@@ -2,6 +2,7 @@ package com.arthexis.platform.transfer;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.stereotype.Component;
 
@@ -24,18 +25,53 @@ public class OcppFtpUrlFactory {
                 () -> new IllegalArgumentException("No FTP binding configured for charger: " + chargerId));
     String normalizedPath = normalize(relativePath);
     String path = String.format("/%s/%s", chargerId, normalizedPath);
+    String encodedUserInfo =
+        String.format(
+            Locale.ROOT,
+            "%s:%s",
+            encodeUserInfoComponent(binding.username()),
+            encodeUserInfoComponent(binding.password()));
     try {
-      return new URI(
-          "ftp",
-          String.format(Locale.ROOT, "%s:%s", binding.username(), binding.password()),
-          properties.publicHost(),
-          properties.port(),
-          path,
-          null,
-          null);
+      URI encodedPathUri =
+          new URI("ftp", null, properties.publicHost(), properties.port(), path, null, null);
+      String uri =
+          String.format(
+              Locale.ROOT,
+              "ftp://%s@%s%s",
+              encodedUserInfo,
+              encodedPathUri.getRawAuthority(),
+              encodedPathUri.getRawPath());
+      return URI.create(uri);
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException("Failed to build FTP URI", e);
     }
+  }
+
+  private String encodeUserInfoComponent(String value) {
+    StringBuilder encoded = new StringBuilder();
+    byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+    for (byte candidate : bytes) {
+      int unsigned = candidate & 0xFF;
+      if (isUnreserved(unsigned)) {
+        encoded.append((char) unsigned);
+      } else {
+        encoded.append('%');
+        char hi = Character.forDigit((unsigned >> 4) & 0xF, 16);
+        char lo = Character.forDigit(unsigned & 0xF, 16);
+        encoded.append(Character.toUpperCase(hi)).append(Character.toUpperCase(lo));
+      }
+    }
+    return encoded.toString();
+  }
+
+  private boolean isUnreserved(int value) {
+    return (value >= 'a' && value <= 'z')
+        || (value >= 'A' && value <= 'Z')
+        || (value >= '0' && value <= '9')
+        || value == '-'
+        || value == '.'
+        || value == '_'
+        || value == '~';
   }
 
   private String normalize(String relativePath) {
