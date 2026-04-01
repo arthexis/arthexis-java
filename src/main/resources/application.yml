@@ -39,6 +39,8 @@ arthexis:
   jobs:
     station-poll-enabled: true
     station-poll-delay-ms: 60000
+    station-poll-queue: arthexis.station.poll
+    max-attempts: 3
   ocpp:
     commands:
       retry-delay: 20s
