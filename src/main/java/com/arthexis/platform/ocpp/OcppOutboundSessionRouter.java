@@ -1,7 +1,5 @@
 package com.arthexis.platform.ocpp;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,12 +10,12 @@ import org.springframework.web.socket.WebSocketSession;
 @Component
 public class OcppOutboundSessionRouter {
 
-  private final ObjectMapper objectMapper;
+  private final OcppFrameCodec frameCodec;
   private final Map<String, WebSocketSession> sessionsBySessionId = new ConcurrentHashMap<>();
   private final Map<String, String> sessionIdByStationId = new ConcurrentHashMap<>();
 
-  public OcppOutboundSessionRouter(ObjectMapper objectMapper) {
-    this.objectMapper = objectMapper;
+  public OcppOutboundSessionRouter(OcppFrameCodec frameCodec) {
+    this.frameCodec = frameCodec;
   }
 
   public void registerSession(WebSocketSession session) {
@@ -45,10 +43,6 @@ public class OcppOutboundSessionRouter {
     if (session == null || !session.isOpen()) {
       throw new IOException("Resolved websocket session is unavailable for station " + stationId);
     }
-    session.sendMessage(new TextMessage(writeAsJson(message)));
-  }
-
-  private String writeAsJson(OcppMessage message) throws JsonProcessingException {
-    return objectMapper.writeValueAsString(message);
+    session.sendMessage(new TextMessage(frameCodec.encode(message)));
   }
 }

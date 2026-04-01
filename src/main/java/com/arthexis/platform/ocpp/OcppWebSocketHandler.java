@@ -1,6 +1,5 @@
 package com.arthexis.platform.ocpp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -11,7 +10,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @Component
 public class OcppWebSocketHandler extends TextWebSocketHandler {
 
-  private final ObjectMapper objectMapper;
+  private final OcppFrameCodec frameCodec;
   private final OcaOcppBridgeService ocaOcppBridgeService;
   private final OcppSessionAuditService sessionAuditService;
   private final OcppCommandDispatchService commandDispatchService;
@@ -19,13 +18,13 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
   private final OcppSessionStateStore stateStore;
 
   public OcppWebSocketHandler(
-      ObjectMapper objectMapper,
+      OcppFrameCodec frameCodec,
       OcaOcppBridgeService ocaOcppBridgeService,
       OcppSessionAuditService sessionAuditService,
       OcppCommandDispatchService commandDispatchService,
       OcppOutboundSessionRouter outboundSessionRouter,
       OcppSessionStateStore stateStore) {
-    this.objectMapper = objectMapper;
+    this.frameCodec = frameCodec;
     this.ocaOcppBridgeService = ocaOcppBridgeService;
     this.sessionAuditService = sessionAuditService;
     this.commandDispatchService = commandDispatchService;
@@ -49,7 +48,7 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
   protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
     OcppMessage incoming;
     try {
-      incoming = objectMapper.readValue(message.getPayload(), OcppMessage.class);
+      incoming = frameCodec.decode(message.getPayload());
     } catch (IOException ex) {
       sessionAuditService.recordIncomingParseFailure(session.getId(), message.getPayload());
       throw ex;
@@ -81,6 +80,6 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
     sessionAuditService.recordOutgoingCallResult(
         session.getId(), ack, bridgeResponse.stationId(), bridgeResponse.resultStatus());
 
-    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(ack)));
+    session.sendMessage(new TextMessage(frameCodec.encode(ack)));
   }
 }

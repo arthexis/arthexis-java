@@ -56,7 +56,7 @@ class OcppCommandDispatchServiceTests {
     properties.setRetryDelay(Duration.ofSeconds(1));
     properties.setMaxRetries(3);
 
-    sessionRouter = new OcppOutboundSessionRouter(new ObjectMapper());
+    sessionRouter = new OcppOutboundSessionRouter(new OcppFrameCodec(new ObjectMapper()));
 
     stateStore = new NoopStateStore();
 
