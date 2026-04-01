@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -107,8 +108,16 @@ public class OcaOcppBridgeService {
       case "StartTransaction" -> {
         Map<String, Object> normalized = payloadNormalizer.normalizeStartTransaction(stationId, payload);
         int connectorId = intValue(normalized.get("connectorId"), 1);
+        int transactionId = resolveTransactionId(stationId, normalized);
+        stateStore.storeTransactionConnector(stationId, transactionId, connectorId);
         connectorStateService.upsertConnectorState(
-            stationId, 1, connectorId, "CHARGING", "", "Operative", Instant.now());
+            stationId,
+            1,
+            connectorId,
+            "CHARGING",
+            "",
+            "Operative",
+            resolveEventTimestamp(normalized));
         chargingStationService.upsertStatus(stationId, "CHARGING", buildAdminDetails(payload, false));
         yield response(
             stationId,
@@ -116,13 +125,20 @@ public class OcaOcppBridgeService {
                 "idTagInfo",
                 Map.of("status", "Accepted"),
                 "transactionId",
-                intValue(normalized.get("transactionId"), 1)));
+                transactionId));
       }
       case "StopTransaction" -> {
         Map<String, Object> normalized = payloadNormalizer.normalizeStopTransaction(stationId, payload);
-        int connectorId = intValue(normalized.get("connectorId"), 1);
+        int transactionId = intValue(normalized.get("transactionId"), -1);
+        int connectorId = resolveStopConnectorId(stationId, normalized, transactionId);
         connectorStateService.upsertConnectorState(
-            stationId, 1, connectorId, "AVAILABLE", "", "Operative", Instant.now());
+            stationId,
+            1,
+            connectorId,
+            "AVAILABLE",
+            "",
+            "Operative",
+            resolveEventTimestamp(normalized));
         chargingStationService.upsertStatus(stationId, "AVAILABLE", buildAdminDetails(payload, false));
         yield response(stationId, Map.of("idTagInfo", Map.of("status", "Accepted")));
       }
@@ -188,6 +204,29 @@ public class OcaOcppBridgeService {
     Object connectorId =
         firstNonNull(evse.get("connectorId"), payload.get("connectorId"), payload.get("connector"), 1);
     return intValue(connectorId, 1);
+  }
+
+  private int resolveTransactionId(String stationId, Map<String, Object> normalized) {
+    int transactionId = intValue(normalized.get("transactionId"), -1);
+    if (transactionId > 0) {
+      return transactionId;
+    }
+    return stateStore.reserveTransactionId(stationId);
+  }
+
+  private int resolveStopConnectorId(
+      String stationId, Map<String, Object> normalized, int transactionId) {
+    int normalizedConnectorId = intValue(normalized.get("connectorId"), -1);
+    if (normalizedConnectorId > 0) {
+      return normalizedConnectorId;
+    }
+    if (transactionId > 0) {
+      OptionalInt connectorId = stateStore.findTransactionConnector(stationId, transactionId);
+      if (connectorId.isPresent()) {
+        return connectorId.getAsInt();
+      }
+    }
+    return 1;
   }
 
   private ChargingStationAdminDetails buildAdminDetails(

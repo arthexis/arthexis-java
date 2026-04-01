@@ -3,6 +3,7 @@ package com.arthexis.platform.ocpp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +14,7 @@ import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -237,9 +239,30 @@ class OcaOcppBridgeServiceTests {
 
     verify(connectorStateService)
         .upsertConnectorState(eq("CP-16"), eq(1), eq(2), eq("CHARGING"), eq(""), eq("Operative"), any());
+    verify(stateStore).storeTransactionConnector("CP-16", 55, 2);
+    verify(stateStore, never()).reserveTransactionId(any());
     verify(chargingStationService).upsertStatus(eq("CP-16"), eq("CHARGING"), any());
     assertThat(response.payload())
         .isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted"), "transactionId", 55));
+  }
+
+  @Test
+  void startTransactionWithoutTransactionIdReservesUniqueTransactionId() {
+    when(stateStore.reserveTransactionId("CP-16")).thenReturn(701);
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-start-generated",
+            new OcppMessage(
+                "2",
+                "msg-start-16-generated",
+                "StartTransaction",
+                Map.of("stationId", "CP-16", "connectorId", 2, "idTag", "CARD-16", "meterStart", 100)));
+
+    verify(stateStore).reserveTransactionId("CP-16");
+    verify(stateStore).storeTransactionConnector("CP-16", 701, 2);
+    assertThat(response.payload())
+        .isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted"), "transactionId", 701));
   }
 
   @Test
@@ -256,6 +279,25 @@ class OcaOcppBridgeServiceTests {
     verify(connectorStateService)
         .upsertConnectorState(eq("CP-16"), eq(1), eq(2), eq("AVAILABLE"), eq(""), eq("Operative"), any());
     verify(chargingStationService).upsertStatus(eq("CP-16"), eq("AVAILABLE"), any());
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted")));
+  }
+
+  @Test
+  void stopTransactionUsesStoredConnectorWhenPayloadOmitsConnectorId() {
+    when(stateStore.findTransactionConnector("CP-16", 55)).thenReturn(OptionalInt.of(2));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-stop-lookup",
+            new OcppMessage(
+                "2",
+                "msg-stop-16-lookup",
+                "StopTransaction",
+                Map.of("stationId", "CP-16", "meterStop", 125, "transactionId", 55)));
+
+    verify(stateStore).findTransactionConnector("CP-16", 55);
+    verify(connectorStateService)
+        .upsertConnectorState(eq("CP-16"), eq(1), eq(2), eq("AVAILABLE"), eq(""), eq("Operative"), any());
     assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted")));
   }
 
