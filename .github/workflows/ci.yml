@@ -227,3 +227,52 @@ jobs:
         run: |
           echo "RPI compatibility verification failed for: ${{ matrix.distro }} / ${{ matrix.install_mode }}"
           exit 1
+
+  ui-screenshots:
+    name: ui-screenshots
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Chromium for Playwright
+        run: npx --yes -p playwright@1.53.0 playwright install --with-deps chromium
+      - name: Capture admin and user UI screenshots
+        run: |
+          mkdir -p artifacts/screenshots
+          npx --yes -p playwright@1.53.0 node <<'EOF_NODE'
+          const { chromium } = require('playwright');
+          const path = require('node:path');
+
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+
+            const captures = [
+              {
+                input: path.resolve('src/main/resources/static/admin/index.html'),
+                output: path.resolve('artifacts/screenshots/admin-ui.png')
+              },
+              {
+                input: path.resolve('src/main/resources/static/cp/index.html'),
+                output: path.resolve('artifacts/screenshots/user-ui.png')
+              }
+            ];
+
+            for (const capture of captures) {
+              await page.goto(`file://${capture.input}`);
+              await page.screenshot({ path: capture.output, fullPage: true });
+            }
+
+            await browser.close();
+          })();
+          EOF_NODE
+      - name: Upload UI screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: artifacts/screenshots
