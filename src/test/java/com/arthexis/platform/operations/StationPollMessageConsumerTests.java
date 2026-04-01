@@ -68,7 +68,12 @@ class StationPollMessageConsumerTests {
 
     JobExecutionRecord record = repository.findAll().getFirst();
     assertThat(record.getStatus()).isEqualTo(JobExecutionStatus.RETRY_SCHEDULED);
-    verify(rabbitTemplate).convertAndSend(eq("arthexis.jobs.retry"), eq("station.poll.retry"), any(), any());
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq("arthexis.jobs.retry"),
+            eq("station.poll.retry"),
+            any(Object.class),
+            any(org.springframework.amqp.core.MessagePostProcessor.class));
 
     Message finalAttempt =
         MessageBuilder.withBody("all".getBytes())
@@ -81,6 +86,11 @@ class StationPollMessageConsumerTests {
 
     JobExecutionRecord updated = repository.findAll().getFirst();
     assertThat(updated.getStatus()).isEqualTo(JobExecutionStatus.FAILED);
-    verify(rabbitTemplate).convertAndSend(eq("arthexis.jobs.dlx"), eq("station.poll.dead"), any(), any());
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq("arthexis.jobs.dlx"),
+            eq("station.poll.dead"),
+            any(Object.class),
+            any(org.springframework.amqp.core.MessagePostProcessor.class));
   }
 }

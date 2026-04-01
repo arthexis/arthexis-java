@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.arthexis.platform.app.admin.AdminCommandGateway;
 import com.arthexis.platform.app.admin.AdminCommandResult;
+import com.arthexis.platform.app.admin.AdminCommandStatus;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import javax.crypto.Mac;
@@ -38,7 +39,7 @@ class AdminMfaIntegrationTests {
     when(adminCommandGateway.submit(any(), anyString()))
         .thenReturn(
             new AdminCommandResult(
-                "cmd-1", "station-1", "smartCharging", "setChargingProfile", "accepted", "ok", Instant.now()));
+                "cmd-1", "station-1", "smartCharging", "setChargingProfile", AdminCommandStatus.ACKNOWLEDGED, "ok", Instant.now()));
   }
 
   @Test

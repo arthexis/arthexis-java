@@ -353,7 +353,7 @@ jobs:
           set -o pipefail
           set +e
           mkdir -p artifacts/screenshots
-          npx --yes -p playwright@1.53.0 node <<'EOF_NODE' 2>&1 | tee ci-ui-screenshots.log
+          cat > ci-capture-screenshots.js <<'EOF_NODE'
           const { chromium } = require('playwright');
           const path = require('node:path');
 
@@ -380,7 +380,9 @@ jobs:
             await browser.close();
           })();
           EOF_NODE
+          npx --yes -p playwright@1.53.0 -c 'node ci-capture-screenshots.js' 2>&1 | tee ci-ui-screenshots.log
           status=${PIPESTATUS[0]}
+          rm -f ci-capture-screenshots.js
           set -e
           echo "status=$status" >> "$GITHUB_OUTPUT"
 
