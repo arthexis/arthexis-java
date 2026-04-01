@@ -1,6 +1,9 @@
 package com.arthexis.platform.app.admin;
 
+import com.arthexis.platform.billing.BillingSessionRatedEvent;
+import com.arthexis.platform.firmware.FirmwareRolloutStatusChangedEvent;
 import com.arthexis.platform.telemetry.TelemetrySummaryEvent;
+import com.arthexis.platform.users.UserIdentityMetadataChangedEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.context.event.EventListener;
@@ -64,6 +67,47 @@ public class AdminWebSocketDomainEventBridge {
     publish(new AdminRealtimePayload("session.message.persisted", event.stationId(), event.occurredAt(), details));
   }
 
+
+  @EventListener
+  public void onUserIdentityMetadataChanged(UserIdentityMetadataChangedEvent event) {
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("tenantId", event.tenantId());
+    details.put("accountId", event.accountId());
+    details.put("operatorId", event.operatorId());
+    details.put("customerId", event.customerId());
+    details.put("identityState", event.identityState());
+
+    publish(
+        new AdminRealtimePayload(
+            "users.identity.metadata.changed", null, event.occurredAt(), details));
+  }
+
+  @EventListener
+  public void onBillingSessionRated(BillingSessionRatedEvent event) {
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("sessionId", event.sessionId());
+    details.put("tenantId", event.tenantId());
+    details.put("accountId", event.accountId());
+    details.put("ratedWh", event.ratedWh());
+    details.put("ratedAmount", event.ratedAmount());
+    details.put("currency", event.currency());
+    details.put("invoiceReady", event.invoiceReady());
+
+    publish(new AdminRealtimePayload("billing.session.rated", event.stationId(), event.occurredAt(), details));
+  }
+
+  @EventListener
+  public void onFirmwareRolloutStatusChanged(FirmwareRolloutStatusChangedEvent event) {
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("campaignId", event.campaignId());
+    details.put("tenantId", event.tenantId());
+    details.put("targetVersion", event.targetVersion());
+    details.put("rolloutState", event.rolloutState());
+
+    publish(
+        new AdminRealtimePayload(
+            "firmware.rollout.status.changed", event.stationId(), event.occurredAt(), details));
+  }
 
   @EventListener
   public void onCommandStatusChanged(OcppCommandStatusChangedEvent event) {
