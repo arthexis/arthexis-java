@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.arthexis.platform.security.SecurityConfig;
+import com.arthexis.platform.security.MfaService;
 import com.arthexis.platform.telemetry.TelemetrySample;
 import com.arthexis.platform.telemetry.TelemetrySampleRepository;
 import java.time.Instant;
@@ -20,15 +21,18 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CpChargingController.class)
 @Import({SecurityConfig.class, CpChargingRealtimeService.class, CpChargingControllerTests.TestUsers.class})
+@ActiveProfiles("test")
 class CpChargingControllerTests {
 
   @Autowired private MockMvc mockMvc;
 
   @MockBean private TelemetrySampleRepository telemetrySampleRepository;
+  @MockBean private MfaService mfaService;
 
   @Test
   void redirectsToCpChargingPage() throws Exception {

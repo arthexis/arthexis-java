@@ -5,8 +5,8 @@ create table if not exists admin_webauthn_credentials (
     public_key_cose text not null,
     sign_count bigint not null default 0,
     transports varchar(256),
-    created_at timestamptz not null,
-    last_used_at timestamptz
+    created_at timestamp not null,
+    last_used_at timestamp
 );
 
 create index if not exists idx_admin_webauthn_credentials_username
@@ -17,16 +17,16 @@ create table if not exists admin_totp_factors (
     username varchar(255) not null unique,
     secret varchar(512) not null,
     enabled boolean not null default false,
-    enrolled_at timestamptz not null,
-    verified_at timestamptz
+    enrolled_at timestamp not null,
+    verified_at timestamp
 );
 
 create table if not exists admin_step_up_sessions (
     token varchar(128) primary key,
     username varchar(255) not null,
     factor_type varchar(32) not null,
-    created_at timestamptz not null,
-    expires_at timestamptz not null
+    created_at timestamp not null,
+    expires_at timestamp not null
 );
 
 create index if not exists idx_admin_step_up_sessions_username_expires_at

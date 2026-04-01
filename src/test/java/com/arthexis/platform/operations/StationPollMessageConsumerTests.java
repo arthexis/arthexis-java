@@ -8,17 +8,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
 @DataJpaTest
-@Import({JobExecutionTracker.class})
+@Import({JobExecutionTracker.class, StationPollMessageConsumerTests.TestMetricsConfig.class})
 class StationPollMessageConsumerTests {
 
   @org.springframework.beans.factory.annotation.Autowired JobExecutionRecordRepository repository;
@@ -68,7 +70,12 @@ class StationPollMessageConsumerTests {
 
     JobExecutionRecord record = repository.findAll().getFirst();
     assertThat(record.getStatus()).isEqualTo(JobExecutionStatus.RETRY_SCHEDULED);
-    verify(rabbitTemplate).convertAndSend(eq("arthexis.jobs.retry"), eq("station.poll.retry"), any(), any());
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq("arthexis.jobs.retry"),
+            eq("station.poll.retry"),
+            any(),
+            any(MessagePostProcessor.class));
 
     Message finalAttempt =
         MessageBuilder.withBody("all".getBytes())
@@ -81,6 +88,19 @@ class StationPollMessageConsumerTests {
 
     JobExecutionRecord updated = repository.findAll().getFirst();
     assertThat(updated.getStatus()).isEqualTo(JobExecutionStatus.FAILED);
-    verify(rabbitTemplate).convertAndSend(eq("arthexis.jobs.dlx"), eq("station.poll.dead"), any(), any());
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq("arthexis.jobs.dlx"),
+            eq("station.poll.dead"),
+            any(),
+            any(MessagePostProcessor.class));
+  }
+
+  @org.springframework.boot.test.context.TestConfiguration
+  static class TestMetricsConfig {
+    @org.springframework.context.annotation.Bean
+    MeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
+    }
   }
 }
