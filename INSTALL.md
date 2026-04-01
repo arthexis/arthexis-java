@@ -9,7 +9,8 @@ Install the following tools first:
 - **Git**
 - **Java 21** (required by this project)
 - **Maven 3.9+**
-- **Docker + Docker Compose plugin** (recommended for Postgres/Redis/RabbitMQ)
+- **systemd-managed Postgres/Redis/RabbitMQ services** (default install path)
+- **Docker + Docker Compose plugin** (optional local dependency mode)
 
 ### Windows setup notes
 
@@ -77,7 +78,7 @@ The repository includes `./bin/arthexis` with command surfaces aligned to Arthex
 ./bin/arthexis upgrade
 ```
 
-- `install` starts Docker dependencies, runs full `mvn -B verify`, then starts the app.
+- `install` starts systemd dependencies by default (or Docker with `--docker`), runs full `mvn -B verify`, then starts the app.
 - `upgrade` executes Flyway upgrade validation (`FlywayUpgradePathTests`) like CI.
 - `verify` accepts `new-install` or `upgrade-install`.
 
@@ -85,10 +86,26 @@ Optional flags:
 
 ```bash
 ./bin/arthexis install --with-observability
+./bin/arthexis install --docker
+./bin/arthexis install --service 'arthexis-%s'
 ./bin/arthexis run --h2
 ```
 
+`--service` applies to systemd unit names when `install` runs without `--docker`.
+Use `%s` as the placeholder for the base service name (for example `arthexis-%s`).
+If `%s` is omitted, Arthexis appends `-%s` automatically (for example `--service arthexis` becomes `arthexis-%s`).
+
 ## 4) Start infrastructure services (Postgres, Redis, RabbitMQ)
+
+Default Arthexis install flow uses systemd services:
+
+```bash
+sudo systemctl enable --now postgresql
+sudo systemctl enable --now redis-server
+sudo systemctl enable --now rabbitmq-server
+```
+
+Optional Docker mode:
 
 From the repository root:
 
@@ -108,7 +125,8 @@ docker compose up -d prometheus grafana
 mvn spring-boot:run
 ```
 
-The app starts with the default Spring profile and connects to the Docker-backed services.
+The app starts with the default Spring profile and connects to the configured backing services
+(systemd by default, Docker when `install --docker` is used).
 
 ## 6) Alternative local mode: in-memory H2
 

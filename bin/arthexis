@@ -8,14 +8,14 @@ usage() {
 Arthexis Java CLI
 
 Usage:
-  ./bin/arthexis install [--h2] [--with-observability]
+  ./bin/arthexis install [--h2] [--with-observability] [--docker] [--service <pattern>]
   ./bin/arthexis upgrade
   ./bin/arthexis verify [new-install|upgrade-install]
   ./bin/arthexis run [--h2]
   ./bin/arthexis help
 
 Commands:
-  install   Start local dependencies and run full verification for a new install.
+  install   Start local dependencies (systemd by default) and run full verification.
   upgrade   Run Flyway upgrade-path verification.
   verify    Run install/upgrade verification used by CI.
   run       Start the app via Maven (optionally with in-memory H2 profile).
@@ -33,6 +33,8 @@ ensure_repo_root() {
 run_install() {
   local use_h2=false
   local with_observability=false
+  local use_docker=false
+  local service_pattern="%s"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -44,6 +46,19 @@ run_install() {
         with_observability=true
         shift
         ;;
+      --docker)
+        use_docker=true
+        shift
+        ;;
+      --service)
+        if [[ $# -lt 2 ]]; then
+          echo "error: --service requires a value" >&2
+          usage
+          exit 1
+        fi
+        service_pattern="$2"
+        shift 2
+        ;;
       *)
         echo "error: unknown option for install: $1" >&2
         usage
@@ -52,10 +67,51 @@ run_install() {
     esac
   done
 
+  if [[ "$service_pattern" != *"%s"* ]]; then
+    service_pattern="${service_pattern}-%s"
+  fi
+
+  apply_service_pattern() {
+    local pattern="$1"
+    local base_name="$2"
+    printf "$pattern" "$base_name"
+  }
+
+  start_first_available_systemd_service() {
+    local label="$1"
+    local pattern="$2"
+    shift 2
+    local service_name=""
+    local base_name=""
+    local candidates=("$@")
+    for base_name in "${candidates[@]}"; do
+      service_name="$(apply_service_pattern "$pattern" "$base_name")"
+      if systemctl list-unit-files "${service_name}.service" >/dev/null 2>&1; then
+        echo "Starting ${label} via systemd service: ${service_name}"
+        sudo systemctl enable --now "${service_name}"
+        return 0
+      fi
+    done
+    echo "error: no known systemd service found for ${label}. Pattern: ${pattern}; bases: ${candidates[*]}" >&2
+    return 1
+  }
+
   pushd "$ROOT_DIR" >/dev/null
-  docker compose up -d postgres redis rabbitmq
-  if [[ "$with_observability" == "true" ]]; then
-    docker compose up -d prometheus grafana
+  if [[ "$use_docker" == "true" ]]; then
+    docker compose up -d postgres redis rabbitmq
+    if [[ "$with_observability" == "true" ]]; then
+      docker compose up -d prometheus grafana
+    fi
+  else
+    start_first_available_systemd_service "PostgreSQL" "$service_pattern" postgresql postgresql@14-main postgresql@15-main
+    start_first_available_systemd_service "Redis" "$service_pattern" redis redis-server
+    start_first_available_systemd_service "RabbitMQ" "$service_pattern" rabbitmq-server
+    if [[ "$with_observability" == "true" ]]; then
+      echo "warning: --with-observability under systemd mode expects Prometheus/Grafana"
+      echo "         to already be installed/configured as system services."
+      start_first_available_systemd_service "Prometheus" "$service_pattern" prometheus
+      start_first_available_systemd_service "Grafana" "$service_pattern" grafana-server
+    fi
   fi
 
   mvn -B verify
