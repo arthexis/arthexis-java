@@ -1,19 +1,44 @@
 package com.arthexis.platform.ocpp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+import com.arthexis.platform.auth.AuthorizationDecision;
+import com.arthexis.platform.auth.RfidAuthorizationGateway;
+import com.arthexis.platform.charging.ChargingConnectorStateService;
+import com.arthexis.platform.charging.ChargingStationService;
+import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class OcaOcppBridgeServiceTests {
 
+  @Mock private ChargingStationService chargingStationService;
+  @Mock private ChargingConnectorStateService connectorStateService;
+  @Mock private OcppSessionStateStore stateStore;
+  @Mock private TelemetryIngestionService telemetryIngestionService;
+  @Mock private RfidAuthorizationGateway rfidAuthorizationGateway;
+
   private OcaOcppPayloadNormalizer normalizer;
+  private OcaOcppBridgeService bridgeService;
 
   @BeforeEach
   void setUp() {
     normalizer = new OcaOcppPayloadNormalizer();
+    bridgeService =
+        new OcaOcppBridgeService(
+            chargingStationService,
+            connectorStateService,
+            stateStore,
+            telemetryIngestionService,
+            normalizer,
+            rfidAuthorizationGateway);
   }
 
   @Test
@@ -69,5 +94,120 @@ class OcaOcppBridgeServiceTests {
     assertThat(normalizedPayload).containsEntry("stationId", "CP-2X");
     assertThat(normalizedPayload).containsEntry("Energy.Active.Import.Register", 12.3d);
     assertThat(normalizedPayload).containsEntry("sampledAt", "2026-03-31T01:00:00Z");
+  }
+
+  @Test
+  void authorizeOcpp16UsesIdTagAndReturnsAcceptedStatus() {
+    when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+        .thenReturn(new AuthorizationDecision(true, "Accepted", "RFID", "acct-16", null, "ok"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-16",
+            new OcppMessage(
+                "2", "msg-auth-16", "Authorize", Map.of("stationId", "CP-16", "idTag", "CARD-16")));
+
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted")));
+  }
+
+  @Test
+  void authorizeOcpp16UsesIdTagAndReturnsDeniedStatus() {
+    when(rfidAuthorizationGateway.authorize("CP-16", "CARD-16"))
+        .thenReturn(
+            new AuthorizationDecision(
+                false, "Blocked", "ACCOUNT_LOGIN", "acct-16", "https://example/login", "blocked"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-16",
+            new OcppMessage(
+                "2", "msg-auth-16", "Authorize", Map.of("stationId", "CP-16", "idTag", "CARD-16")));
+
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Blocked")));
+  }
+
+  @Test
+  void authorizeOcpp2xUsesIdTokenAndReturnsAcceptedStatus() {
+    when(rfidAuthorizationGateway.authorize("CP-2X", "CARD-2X"))
+        .thenReturn(new AuthorizationDecision(true, "Accepted", "RFID", "acct-2x", null, "ok"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-2x",
+            new OcppMessage(
+                "2",
+                "msg-auth-2x",
+                "Authorize",
+                Map.of(
+                    "chargingStation", Map.of("serialNumber", "CP-2X"),
+                    "idToken", Map.of("idToken", "CARD-2X"))));
+
+    assertThat(response.payload())
+        .containsEntry(
+            "idTokenInfo",
+            Map.of(
+                "status",
+                "Accepted",
+                "customData",
+                Map.of("authMode", "RFID", "reason", "ok")));
+    assertThat(response.payload()).containsEntry("customData", Map.of("accountExternalId", "acct-2x", "cardUid", "CARD-2X"));
+  }
+
+  @Test
+  void authorizeOcpp2xUsesIdTokenAndReturnsDeniedStatus() {
+    when(rfidAuthorizationGateway.authorize("CP-2X", "CARD-2X"))
+        .thenReturn(
+            new AuthorizationDecision(
+                false,
+                "Invalid",
+                "ACCOUNT_LOGIN",
+                "acct-2x",
+                "https://example/login",
+                "rfid_card_unknown"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-2x",
+            new OcppMessage(
+                "2",
+                "msg-auth-2x",
+                "Authorize",
+                Map.of(
+                    "chargingStation", Map.of("serialNumber", "CP-2X"),
+                    "idToken", Map.of("idToken", "CARD-2X"))));
+
+    assertThat(response.payload())
+        .containsEntry(
+            "idTokenInfo",
+            Map.of(
+                "status",
+                "Invalid",
+                "customData",
+                Map.of("authMode", "ACCOUNT_LOGIN", "reason", "rfid_card_unknown")));
+    assertThat(response.payload())
+        .containsEntry(
+            "customData",
+            Map.of(
+                "accountExternalId",
+                "acct-2x",
+                "cardUid",
+                "CARD-2X",
+                "loginUrl",
+                "https://example/login"));
+  }
+
+  @Test
+  void authorizeMissingTokenReturnsInvalidStatus() {
+    when(rfidAuthorizationGateway.authorize("CP-16", null))
+        .thenReturn(
+            new AuthorizationDecision(
+                false, "Invalid", "ACCOUNT_LOGIN", null, null, "rfid_card_unknown"));
+
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-missing",
+            new OcppMessage("2", "msg-auth-missing", "Authorize", Map.of("stationId", "CP-16")));
+
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Invalid")));
   }
 }
