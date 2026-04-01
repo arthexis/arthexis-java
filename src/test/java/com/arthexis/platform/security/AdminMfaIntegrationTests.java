@@ -12,7 +12,6 @@ import com.arthexis.platform.app.admin.AdminCommandGateway;
 import com.arthexis.platform.app.admin.AdminCommandResult;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +66,9 @@ class AdminMfaIntegrationTests {
             .getResponse()
             .getContentAsString();
     String secret = new com.fasterxml.jackson.databind.ObjectMapper().readTree(enrollPayload).get("secret").asText();
+    String otpauthUri =
+        new com.fasterxml.jackson.databind.ObjectMapper().readTree(enrollPayload).get("otpauthUri").asText();
+    org.assertj.core.api.Assertions.assertThat(otpauthUri).contains("otpauth://totp/Arthexis%3Aalice");
     String code = totp(secret, Instant.now());
 
     String verifyPayload =
@@ -109,7 +111,7 @@ class AdminMfaIntegrationTests {
   }
 
   private String totp(String secret, Instant instant) throws Exception {
-    byte[] key = Base64.getDecoder().decode(secret);
+    byte[] key = decodeBase32(secret);
     long counter = instant.getEpochSecond() / 30L;
     ByteBuffer message = ByteBuffer.allocate(8).putLong(counter);
     Mac mac = Mac.getInstance("HmacSHA1");
@@ -123,6 +125,32 @@ class AdminMfaIntegrationTests {
             | (hash[offset + 3] & 0xFF);
     int otp = binary % 1_000_000;
     return String.format("%06d", otp);
+  }
+
+  private byte[] decodeBase32(String value) {
+    String normalized = value.replace("=", "").toUpperCase();
+    byte[] decoded = new byte[(normalized.length() * 5) / 8];
+    int buffer = 0;
+    int bitsLeft = 0;
+    int outputIndex = 0;
+    for (int i = 0; i < normalized.length(); i++) {
+      char current = normalized.charAt(i);
+      int base32Value;
+      if (current >= 'A' && current <= 'Z') {
+        base32Value = current - 'A';
+      } else if (current >= '2' && current <= '7') {
+        base32Value = current - '2' + 26;
+      } else {
+        throw new IllegalArgumentException("Invalid base32 value");
+      }
+      buffer = (buffer << 5) | base32Value;
+      bitsLeft += 5;
+      if (bitsLeft >= 8) {
+        decoded[outputIndex++] = (byte) ((buffer >> (bitsLeft - 8)) & 0xFF);
+        bitsLeft -= 8;
+      }
+    }
+    return decoded;
   }
 
   @Test
@@ -189,6 +217,78 @@ class AdminMfaIntegrationTests {
                     {"stationId":"station-1","component":"smartCharging","action":"setChargingProfile","payload":{}}
                     """))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void webAuthnRegistrationRejectsUsernameMismatch() throws Exception {
+    String optionsPayload =
+        mockMvc
+            .perform(post("/security/mfa/webauthn/register/options").with(user("alice").roles("ADMIN")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String challenge =
+        new com.fasterxml.jackson.databind.ObjectMapper().readTree(optionsPayload).get("challenge").asText();
+
+    mockMvc
+        .perform(
+            post("/security/mfa/webauthn/register/finish")
+                .with(user("alice").roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"username":"mallory","challenge":"%s","credentialId":"cred-1","publicKeyCose":"pk","signCount":1,"transports":"internal"}
+                    """
+                        .formatted(challenge)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void webAuthnAssertionRejectsNonIncreasingSignCounter() throws Exception {
+    String optionsPayload =
+        mockMvc
+            .perform(post("/security/mfa/webauthn/register/options").with(user("alice").roles("ADMIN")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String challenge =
+        new com.fasterxml.jackson.databind.ObjectMapper().readTree(optionsPayload).get("challenge").asText();
+
+    mockMvc
+        .perform(
+            post("/security/mfa/webauthn/register/finish")
+                .with(user("alice").roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"username":"alice","challenge":"%s","credentialId":"cred-counter","publicKeyCose":"pk","signCount":10,"transports":"internal"}
+                    """
+                        .formatted(challenge)))
+        .andExpect(status().isNoContent());
+
+    String assertOptions =
+        mockMvc
+            .perform(post("/security/mfa/webauthn/assert/options").with(user("alice").roles("ADMIN")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String assertChallenge =
+        new com.fasterxml.jackson.databind.ObjectMapper().readTree(assertOptions).get("challenge").asText();
+
+    mockMvc
+        .perform(
+            post("/security/mfa/webauthn/assert/finish")
+                .with(user("alice").roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"username":"alice","challenge":"%s","credentialId":"cred-counter","signCount":10}
+                    """
+                        .formatted(assertChallenge)))
+        .andExpect(status().isBadRequest());
   }
 
 }

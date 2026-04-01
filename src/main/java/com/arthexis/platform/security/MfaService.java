@@ -1,10 +1,10 @@
 package com.arthexis.platform.security;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +23,7 @@ public class MfaService {
   private final AdminWebAuthnCredentialRepository webAuthnCredentialRepository;
   private final AdminTotpFactorRepository totpFactorRepository;
   private final AdminStepUpSessionRepository stepUpSessionRepository;
-  private final Map<String, String> pendingChallenges = new ConcurrentHashMap<>();
+  private final Map<String, PendingChallenge> pendingChallenges = new ConcurrentHashMap<>();
 
   public MfaService(
       AdminWebAuthnCredentialRepository webAuthnCredentialRepository,
@@ -35,8 +35,9 @@ public class MfaService {
   }
 
   public String beginWebAuthnRegistration(String username) {
+    evictExpiredChallenges();
     String challenge = randomBase64(32);
-    pendingChallenges.put("reg:" + username, challenge);
+    pendingChallenges.put("reg:" + username, new PendingChallenge(challenge, Instant.now().plusSeconds(300)));
     return challenge;
   }
 
@@ -53,8 +54,9 @@ public class MfaService {
   }
 
   public WebAuthnAssertionOptions beginWebAuthnAssertion(String username) {
+    evictExpiredChallenges();
     String challenge = randomBase64(32);
-    pendingChallenges.put("assert:" + username, challenge);
+    pendingChallenges.put("assert:" + username, new PendingChallenge(challenge, Instant.now().plusSeconds(300)));
     List<String> credentials =
         webAuthnCredentialRepository.findByUsername(username).stream()
             .map(AdminWebAuthnCredential::getCredentialId)
@@ -68,7 +70,10 @@ public class MfaService {
         webAuthnCredentialRepository
             .findByUsernameAndCredentialId(request.username(), request.credentialId())
             .orElseThrow(() -> new IllegalArgumentException("Unknown WebAuthn credential"));
-    credential.setSignCount(Math.max(credential.getSignCount(), request.signCount()));
+    if (credential.getSignCount() > 0 && request.signCount() <= credential.getSignCount()) {
+      throw new IllegalArgumentException("Invalid WebAuthn signature counter");
+    }
+    credential.setSignCount(request.signCount());
     credential.setLastUsedAt(Instant.now());
     webAuthnCredentialRepository.save(credential);
     return issueStepUpToken(request.username(), "webauthn");
@@ -77,7 +82,7 @@ public class MfaService {
   public TotpEnrollment enrollTotp(String username) {
     byte[] bytes = new byte[20];
     SECURE_RANDOM.nextBytes(bytes);
-    String secret = Base64.getEncoder().withoutPadding().encodeToString(bytes);
+    String secret = encodeBase32(bytes);
     AdminTotpFactor factor = totpFactorRepository.findByUsername(username).orElseGet(AdminTotpFactor::new);
     factor.setUsername(username);
     factor.setSecret(secret);
@@ -85,7 +90,8 @@ public class MfaService {
     factor.setEnrolledAt(Instant.now());
     factor.setVerifiedAt(null);
     totpFactorRepository.save(factor);
-    return new TotpEnrollment(secret, "otpauth://totp/Arthexis:" + username + "?secret=" + secret);
+    String label = urlEncode("Arthexis:" + username);
+    return new TotpEnrollment(secret, "otpauth://totp/" + label + "?secret=" + secret);
   }
 
   public String verifyTotp(String username, String code) {
@@ -126,14 +132,16 @@ public class MfaService {
   }
 
   private void assertChallenge(String key, String providedChallenge) {
-    String expected = pendingChallenges.remove(key);
-    if (expected == null || !expected.equals(providedChallenge)) {
+    PendingChallenge expected = pendingChallenges.remove(key);
+    if (expected == null
+        || expected.expiresAt().isBefore(Instant.now())
+        || !expected.value().equals(providedChallenge)) {
       throw new IllegalArgumentException("Challenge is invalid or expired");
     }
   }
 
   private static String randomBase64(int bytes) {
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes(bytes));
+    return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes(bytes));
   }
 
   private static byte[] randomBytes(int size) {
@@ -154,7 +162,7 @@ public class MfaService {
 
   private String computeTotp(String secret, Instant instant) {
     try {
-      byte[] key = Base64.getDecoder().decode(secret);
+      byte[] key = decodeBase32(secret);
       long counter = instant.getEpochSecond() / 30L;
       ByteBuffer message = ByteBuffer.allocate(8).putLong(counter);
       Mac mac = Mac.getInstance("HmacSHA1");
@@ -176,4 +184,60 @@ public class MfaService {
   public record WebAuthnAssertionOptions(String challenge, List<String> allowCredentials) {}
 
   public record TotpEnrollment(String secret, String otpauthUri) {}
+
+  private record PendingChallenge(String value, Instant expiresAt) {}
+
+  private void evictExpiredChallenges() {
+    Instant now = Instant.now();
+    pendingChallenges.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+  }
+
+  private static String urlEncode(String value) {
+    return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
+  }
+
+  private static String encodeBase32(byte[] bytes) {
+    final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
+    StringBuilder encoded = new StringBuilder((bytes.length * 8 + 4) / 5);
+    int buffer = 0;
+    int bitsLeft = 0;
+    for (byte current : bytes) {
+      buffer = (buffer << 8) | (current & 0xFF);
+      bitsLeft += 8;
+      while (bitsLeft >= 5) {
+        encoded.append(alphabet[(buffer >> (bitsLeft - 5)) & 0x1F]);
+        bitsLeft -= 5;
+      }
+    }
+    if (bitsLeft > 0) {
+      encoded.append(alphabet[(buffer << (5 - bitsLeft)) & 0x1F]);
+    }
+    return encoded.toString();
+  }
+
+  private static byte[] decodeBase32(String value) {
+    String normalized = value.replace("=", "").toUpperCase();
+    byte[] decoded = new byte[(normalized.length() * 5) / 8];
+    int buffer = 0;
+    int bitsLeft = 0;
+    int outputIndex = 0;
+    for (int i = 0; i < normalized.length(); i++) {
+      char current = normalized.charAt(i);
+      int base32Value;
+      if (current >= 'A' && current <= 'Z') {
+        base32Value = current - 'A';
+      } else if (current >= '2' && current <= '7') {
+        base32Value = current - '2' + 26;
+      } else {
+        throw new IllegalArgumentException("TOTP secret is invalid");
+      }
+      buffer = (buffer << 5) | base32Value;
+      bitsLeft += 5;
+      if (bitsLeft >= 8) {
+        decoded[outputIndex++] = (byte) ((buffer >> (bitsLeft - 8)) & 0xFF);
+        bitsLeft -= 8;
+      }
+    }
+    return decoded;
+  }
 }

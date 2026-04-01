@@ -27,7 +27,11 @@ public class MfaController {
 
   @PostMapping("/webauthn/register/finish")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void finishWebAuthnRegistration(@RequestBody WebAuthnRegistrationFinishRequest request) {
+  public void finishWebAuthnRegistration(
+      Principal principal, @RequestBody WebAuthnRegistrationFinishRequest request) {
+    if (!principal.getName().equals(request.username())) {
+      throw new IllegalArgumentException("Username mismatch");
+    }
     mfaService.finishWebAuthnRegistration(request);
   }
 
@@ -42,7 +46,11 @@ public class MfaController {
   }
 
   @PostMapping("/webauthn/assert/finish")
-  public Map<String, String> finishWebAuthnAssertion(@RequestBody WebAuthnAssertionFinishRequest request) {
+  public Map<String, String> finishWebAuthnAssertion(
+      Principal principal, @RequestBody WebAuthnAssertionFinishRequest request) {
+    if (!principal.getName().equals(request.username())) {
+      throw new IllegalArgumentException("Username mismatch");
+    }
     return Map.of("stepUpToken", mfaService.finishWebAuthnAssertion(request), "tokenType", "header");
   }
 
