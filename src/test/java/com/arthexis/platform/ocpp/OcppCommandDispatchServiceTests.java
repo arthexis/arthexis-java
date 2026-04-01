@@ -71,15 +71,69 @@ class OcppCommandDispatchServiceTests {
   }
 
   @Test
-  void rejectsUnsupportedCommandsForPythonProfile() {
+  void acceptsSupportedActionForPythonOcpp16Profile() {
     AdminCommandRequest request =
-        new AdminCommandRequest(
-            "CP-16", "EVSE", "RequestStartTransaction", "python-ocpp16", Map.of());
+        new AdminCommandRequest("CP-16", "EVSE", "SetChargingProfile", "python-ocpp16", Map.of());
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
+  }
+
+  @Test
+  void acceptsSupportedActionForPythonOcpp2xProfile() {
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-2X", "EVSE", "GetDiagnostics", "python-ocpp2x", Map.of());
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
+  }
+
+  @Test
+  void rejectsUnsupportedCommandsWithActionAndProfileInFailureMessage() {
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-16", "EVSE", "TotallyUnsupportedAction", "python-ocpp16", Map.of());
 
     var result = service.submit(request, "admin");
 
     assertThat(result.status()).isEqualTo(AdminCommandStatus.FAILED);
+    assertThat(result.message())
+        .isEqualTo(
+            "Command action 'TotallyUnsupportedAction' is not supported for charger profile 'python-ocpp16'");
     verify(commandRepository, never()).save(any());
+  }
+
+  @Test
+  void usesOcpp2xFallbackWhenUnknownProfileContains2() {
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-2X", "EVSE", "SetChargingProfile", "custom-2-series", Map.of());
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
+  }
+
+  @Test
+  void usesOcpp16FallbackWhenUnknownProfileDoesNotContain2() {
+    AdminCommandRequest request =
+        new AdminCommandRequest("CP-16", "EVSE", "RemoteStartTransaction", "legacy-profile", Map.of());
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isNotEqualTo(AdminCommandStatus.FAILED);
+    verify(commandRepository, atLeast(1)).save(any(OcppCommandRecord.class));
   }
 
   @Test

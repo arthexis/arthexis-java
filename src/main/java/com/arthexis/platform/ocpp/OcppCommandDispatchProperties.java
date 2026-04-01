@@ -54,6 +54,9 @@ public class OcppCommandDispatchProperties {
         orderedSet(
             "RemoteStartTransaction",
             "RemoteStopTransaction",
+            "RequestStartTransaction",
+            "RequestStopTransaction",
+            "SetChargingProfile",
             "ChangeAvailability",
             "Reset",
             "GetDiagnostics",
@@ -63,9 +66,12 @@ public class OcppCommandDispatchProperties {
         orderedSet(
             "RequestStartTransaction",
             "RequestStopTransaction",
+            "RemoteStartTransaction",
+            "RemoteStopTransaction",
             "SetChargingProfile",
             "Reset",
             "ChangeAvailability",
+            "GetDiagnostics",
             "UpdateFirmware"));
     return defaults;
   }

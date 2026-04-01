@@ -138,8 +138,43 @@ Outgoing action support is profile-driven via `arthexis.ocpp.commands.profile-ca
 
 Default registry:
 
-- `python-ocpp16`: `RemoteStartTransaction`, `RemoteStopTransaction`, `ChangeAvailability`, `Reset`, `GetDiagnostics`, `UpdateFirmware`.
-- `python-ocpp2x`: `RequestStartTransaction`, `RequestStopTransaction`, `SetChargingProfile`, `Reset`, `ChangeAvailability`, `UpdateFirmware`.
+- `python-ocpp16`: `RemoteStartTransaction`, `RemoteStopTransaction`, `RequestStartTransaction`, `RequestStopTransaction`, `SetChargingProfile`, `ChangeAvailability`, `Reset`, `GetDiagnostics`, `UpdateFirmware`.
+- `python-ocpp2x`: `RequestStartTransaction`, `RequestStopTransaction`, `RemoteStartTransaction`, `RemoteStopTransaction`, `SetChargingProfile`, `Reset`, `ChangeAvailability`, `GetDiagnostics`, `UpdateFirmware`.
+
+Example override in `application.yml` (no code change required):
+
+```yaml
+arthexis:
+  ocpp:
+    commands:
+      profile-capabilities:
+        python-ocpp16:
+          - RemoteStartTransaction
+          - RemoteStopTransaction
+          - RequestStartTransaction
+          - RequestStopTransaction
+          - SetChargingProfile
+          - ChangeAvailability
+          - Reset
+          - GetDiagnostics
+          - UpdateFirmware
+        python-ocpp2x:
+          - RequestStartTransaction
+          - RequestStopTransaction
+          - RemoteStartTransaction
+          - RemoteStopTransaction
+          - SetChargingProfile
+          - Reset
+          - ChangeAvailability
+          - GetDiagnostics
+          - UpdateFirmware
+        vendor-profile-x:
+          - TriggerMessage
+          - UnlockConnector
+```
+
+Behavior note: configured profile entries are merged with defaults. Custom profile keys are added, and default
+`python-ocpp16` / `python-ocpp2x` entries remain available unless explicitly overridden by key.
 
 Fallback rules:
 

@@ -47,6 +47,31 @@ arthexis:
       ack-timeout: 45s
       max-retries: 3
       scheduler-delay-ms: 5000
+      # Optional: override profile capability maps without code changes.
+      # profile-capabilities:
+      #   python-ocpp16:
+      #     - RemoteStartTransaction
+      #     - RemoteStopTransaction
+      #     - RequestStartTransaction
+      #     - RequestStopTransaction
+      #     - SetChargingProfile
+      #     - ChangeAvailability
+      #     - Reset
+      #     - GetDiagnostics
+      #     - UpdateFirmware
+      #   python-ocpp2x:
+      #     - RequestStartTransaction
+      #     - RequestStopTransaction
+      #     - RemoteStartTransaction
+      #     - RemoteStopTransaction
+      #     - SetChargingProfile
+      #     - Reset
+      #     - ChangeAvailability
+      #     - GetDiagnostics
+      #     - UpdateFirmware
+      #   vendor-profile-x:
+      #     - TriggerMessage
+      #     - UnlockConnector
     simulator:
       enabled: false
       csms-url: ws://localhost:8080/ws/ocpp
