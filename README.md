@@ -23,6 +23,7 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - `com.arthexis.platform.auth` – RFID authorization, account login flows, and charge-point QR login sessions
 - `com.arthexis.platform.security` – API security policy
 - `com.arthexis.platform.simulator` – OCPP charge-point simulator for local CSMS flows
+- `com.arthexis.platform.transfer` – OCPP-aware FTP endpoint with charger-bound credentials for diagnostics/firmware artifacts
 
 
 ## Supported Build Targets
@@ -72,6 +73,24 @@ ARTHEXIS_OCPP_SIMULATOR_ENABLED=true mvn spring-boot:run
 ```
 
 By default, the simulator targets `ws://localhost:8080/ws/ocpp` and identifies as `sim-cp-001`.
+
+You can enable the Arthexis-style OCPP FTP surface to expose charger-scoped firmware/diagnostics artifacts:
+
+```yaml
+arthexis:
+  ocpp:
+    ftp:
+      enabled: true
+      bind-address: 0.0.0.0
+      public-host: ftp.arthexis.local
+      port: 2121
+      root-directory: ./var/ocpp-ftp
+      bindings:
+        - id: fleet-alpha
+          username: fleet-alpha
+          password: ${FTP_ALPHA_PASSWORD}
+          charger-ids: [cp-001, cp-002]
+```
 
 If you want JWT/OAuth2 resource-server validation enabled, set:
 
