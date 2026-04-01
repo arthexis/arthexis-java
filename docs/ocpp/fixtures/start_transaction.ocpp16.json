@@ -1,0 +1,20 @@
+{
+  "name": "start_transaction_ocpp16_compat",
+  "action": "StartTransaction",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-start-16",
+  "payload": {
+    "stationId": "CP-16",
+    "idTag": "CARD-16",
+    "connectorId": 1,
+    "meterStart": 100
+  },
+  "expected": {
+    "resolvedStationId": "CP-16",
+    "responsePayload": {
+      "idTagInfo": {
+        "status": "Accepted"
+      }
+    }
+  }
+}

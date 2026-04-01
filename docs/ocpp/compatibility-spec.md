@@ -11,10 +11,14 @@ Supported incoming actions:
 - `StatusNotification`
 - `MeterValues`
 - `TransactionEvent`
+- `StartTransaction` (1.6 compatibility)
+- `StopTransaction` (1.6 compatibility)
 - `Authorize`
 - `DiagnosticsStatusNotification`
 - `FirmwareStatusNotification`
 - `AvailabilityStatusNotification`
+- `SecurityEventNotification` (accepted no-op)
+- `NotifyEvent` (accepted no-op)
 
 Supported protocol families:
 
@@ -33,6 +37,15 @@ Supported protocol families:
 Edge-case fixtures are included for each identity path, including explicit `sessionId` fallback.
 
 ## Action compatibility matrix
+
+### Inbound action policy registry
+
+`OcppInboundActionPolicy` is the canonical inbound capability registry used by the bridge to classify actions for parity and drift detection.
+
+| Profile | Supported | Partially supported | Ignored | Unsupported handling |
+|---|---|---|---|---|
+| `python-ocpp16` | `BootNotification`, `Heartbeat`, `StatusNotification`, `MeterValues`, `Authorize`, `StartTransaction`, `StopTransaction`, `DiagnosticsStatusNotification`, `FirmwareStatusNotification` | `TransactionEvent`, `AvailabilityStatusNotification` | `DataTransfer`, `SecurityEventNotification`, `NotifyEvent` | Accepted with explicit no-op payload and audit status `unsupported-but-accepted`. |
+| `python-ocpp2x` | `BootNotification`, `Heartbeat`, `StatusNotification`, `MeterValues`, `Authorize`, `TransactionEvent`, `SecurityEventNotification`, `NotifyEvent`, `AvailabilityStatusNotification` | `StartTransaction`, `StopTransaction`, `DiagnosticsStatusNotification`, `FirmwareStatusNotification` | `SignCertificate`, `Get15118EVCertificate`, `DataTransfer` | Accepted with explicit no-op payload and audit status `unsupported-but-accepted`. |
 
 ### BootNotification
 
@@ -81,6 +94,20 @@ Normalizer output contract for `TransactionEvent`:
 - Includes `sampledAt` from top-level `timestamp` when present, otherwise first meter timestamp or current instant.
 - Includes `totalCost` when numeric.
 - Adds measurand metrics as numeric (`Double`).
+
+### StartTransaction
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; identity token recommended | `stationId`, `idTag`, `connectorId`, `meterStart`, `timestamp` | Bridge compatibility handler updates station aggregate status to `CHARGING` and returns `idTagInfo.status=Accepted` with transaction id. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `idToken`, `timestamp` | Handled as partial compatibility bridge path when emitted by transitional clients. |
+
+### StopTransaction
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none | `stationId`, `transactionId`, `meterStop`, `reason`, `timestamp` | Bridge compatibility handler updates station aggregate status to `AVAILABLE` and returns `status=Accepted`. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `transactionId`, `reason` | Partial compatibility for mixed fleets still emitting stop calls outside 2.x `TransactionEvent`. |
 
 ### Authorize
 
@@ -132,6 +159,18 @@ Normalizer output contract for availability status:
 - Includes normalized `status` when available.
 - Includes string `evseId` / `connectorId` when present.
 
+### SecurityEventNotification
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 2.x | none | `chargingStation.serialNumber`, `type`, `timestamp`, `techInfo` | Currently accepted as explicit no-op for parity. Response is `status=Accepted` with `customData.handling=no-op`. Outgoing audit status is `unsupported-but-accepted`. |
+
+### NotifyEvent
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 2.x | none | `chargingStation.serialNumber`, `eventData[]` | Currently accepted as explicit no-op for parity. Response is `status=Accepted` with `customData.handling=no-op`. Outgoing audit status is `unsupported-but-accepted`. |
+
 ## Command dispatch capability registry
 
 Outgoing action support is profile-driven via `arthexis.ocpp.commands.profile-capabilities`.
@@ -167,5 +206,9 @@ Included fixture files:
 - `diagnostics_status.ocpp16.json`
 - `firmware_status.ocpp2x.json`
 - `availability_status.ocpp2x.json`
+- `start_transaction.ocpp16.json`
+- `stop_transaction.ocpp16.json`
+- `security_event_notification.ocpp2x.json`
+- `notify_event.ocpp2x.json`
 
 These fixtures are the contract-test inputs for backward compatibility assertions in `OcaOcppPayloadNormalizerContractTests`.

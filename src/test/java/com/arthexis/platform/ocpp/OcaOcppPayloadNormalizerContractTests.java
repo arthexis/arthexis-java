@@ -135,7 +135,11 @@ class OcaOcppPayloadNormalizerContractTests {
             "meter_values.ocpp16.json",
             "meter_values.ocpp2x.json",
             "transaction_event.ocpp16.json",
-            "transaction_event.ocpp2x.json")
+            "transaction_event.ocpp2x.json",
+            "start_transaction.ocpp16.json",
+            "stop_transaction.ocpp16.json",
+            "security_event_notification.ocpp2x.json",
+            "notify_event.ocpp2x.json")
         .map(Arguments::of);
   }
 

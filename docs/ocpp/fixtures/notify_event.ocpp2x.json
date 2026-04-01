@@ -1,0 +1,28 @@
+{
+  "name": "notify_event_ocpp2x_noop",
+  "action": "NotifyEvent",
+  "ocppVariant": "2.x",
+  "sessionId": "session-notify-2x",
+  "payload": {
+    "chargingStation": {
+      "serialNumber": "CP-2X"
+    },
+    "eventData": [
+      {
+        "eventId": 1,
+        "trigger": "Alerting"
+      }
+    ]
+  },
+  "expected": {
+    "resolvedStationId": "CP-2X",
+    "resultStatus": "unsupported-but-accepted",
+    "responsePayload": {
+      "status": "Accepted",
+      "customData": {
+        "handling": "no-op",
+        "auditStatus": "unsupported-but-accepted"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "stop_transaction_ocpp16_compat",
+  "action": "StopTransaction",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-stop-16",
+  "payload": {
+    "stationId": "CP-16",
+    "transactionId": 44,
+    "meterStop": 180
+  },
+  "expected": {
+    "resolvedStationId": "CP-16",
+    "responsePayload": {
+      "status": "Accepted"
+    }
+  }
+}

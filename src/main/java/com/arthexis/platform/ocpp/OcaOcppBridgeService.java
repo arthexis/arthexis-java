@@ -7,6 +7,7 @@ import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -44,6 +45,7 @@ public class OcaOcppBridgeService {
     @SuppressWarnings("unchecked")
     Map<String, Object> payload = (Map<String, Object>) rawPayload;
     String stationId = payloadNormalizer.resolveStationId(sessionId, payload);
+    String profile = resolveInboundProfile(payload);
 
     return switch (incoming.action()) {
       case "Heartbeat" -> {
@@ -99,6 +101,20 @@ public class OcaOcppBridgeService {
         }
         yield response(stationId, accepted());
       }
+      case "StartTransaction" -> {
+        chargingStationService.upsertStatus(stationId, "CHARGING");
+        yield response(
+            stationId,
+            Map.of(
+                "transactionId",
+                resolveTransactionId(payload, incoming.messageId()),
+                "idTagInfo",
+                Map.of("status", "Accepted")));
+      }
+      case "StopTransaction" -> {
+        chargingStationService.upsertStatus(stationId, "AVAILABLE");
+        yield response(stationId, accepted());
+      }
       case "DiagnosticsStatusNotification" -> {
         chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, accepted());
@@ -122,12 +138,31 @@ public class OcaOcppBridgeService {
             resolveEventTimestamp(normalized));
         yield response(stationId, accepted());
       }
-      default -> response(stationId, accepted());
+      case "SecurityEventNotification" -> {
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        yield response(stationId, acceptedNoOp(), "unsupported-but-accepted");
+      }
+      case "NotifyEvent" -> {
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        yield response(stationId, acceptedNoOp(), "unsupported-but-accepted");
+      }
+      default -> {
+        OcppInboundActionPolicy.ActionSupportLevel supportLevel =
+            OcppInboundActionPolicy.supportLevel(profile, incoming.action());
+        yield supportLevel == OcppInboundActionPolicy.ActionSupportLevel.UNSUPPORTED_BUT_ACCEPTED
+            ? response(stationId, acceptedNoOp(), "unsupported-but-accepted")
+            : response(stationId, accepted());
+      }
     };
   }
 
   private OcppBridgeResponse response(String stationId, Map<String, Object> payload) {
     return new OcppBridgeResponse(stationId, payload, stringValue(payload.get("status")));
+  }
+
+  private OcppBridgeResponse response(
+      String stationId, Map<String, Object> payload, String resultStatus) {
+    return new OcppBridgeResponse(stationId, payload, resultStatus);
   }
 
   private int resolveEvseId(Map<String, Object> payload) {
@@ -302,5 +337,38 @@ public class OcaOcppBridgeService {
 
   private Map<String, Object> accepted() {
     return Map.of("status", "Accepted");
+  }
+
+  private Map<String, Object> acceptedNoOp() {
+    Map<String, Object> customData = new LinkedHashMap<>();
+    customData.put("handling", "no-op");
+    customData.put("auditStatus", "unsupported-but-accepted");
+    return Map.of("status", "Accepted", "customData", customData);
+  }
+
+  private String resolveInboundProfile(Map<String, Object> payload) {
+    if (payload.get("chargingStation") instanceof Map<?, ?>) {
+      return OcppInboundActionPolicy.PROFILE_PYTHON_OCPP2X;
+    }
+    String protocolVersion = stringValue(payload.get("protocolVersion"));
+    if (protocolVersion.contains("2")) {
+      return OcppInboundActionPolicy.PROFILE_PYTHON_OCPP2X;
+    }
+    return OcppInboundActionPolicy.PROFILE_PYTHON_OCPP16;
+  }
+
+  private int resolveTransactionId(Map<String, Object> payload, String messageId) {
+    Object tx = payload.get("transactionId");
+    if (tx instanceof Number number) {
+      return number.intValue();
+    }
+    if (tx != null) {
+      try {
+        return Integer.parseInt(tx.toString());
+      } catch (NumberFormatException ignored) {
+        // Fall through to deterministic message-based id generation.
+      }
+    }
+    return Math.abs((messageId == null ? "" : messageId).hashCode());
   }
 }
