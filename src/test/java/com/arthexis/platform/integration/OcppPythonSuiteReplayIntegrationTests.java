@@ -15,6 +15,7 @@ import com.arthexis.platform.ocpp.OcppMessageRecordRepository;
 import com.arthexis.platform.ocpp.OcppCommandDispatchProperties;
 import com.arthexis.platform.ocpp.OcppCommandDispatchService;
 import com.arthexis.platform.ocpp.OcppCommandRecordRepository;
+import com.arthexis.platform.ocpp.OcppCommandTranslator;
 import com.arthexis.platform.ocpp.OcppOutboundSessionRouter;
 import com.arthexis.platform.ocpp.OcppSessionAuditService;
 import com.arthexis.platform.ocpp.OcppSessionRecordRepository;
