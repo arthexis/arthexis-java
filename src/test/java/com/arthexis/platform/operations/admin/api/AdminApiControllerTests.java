@@ -21,6 +21,7 @@ import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationRepository;
 import com.arthexis.platform.ocpp.OcppCommandRecordRepository;
 import com.arthexis.platform.ocpp.OcppMessageRecordRepository;
+import com.arthexis.platform.security.MfaService;
 import com.arthexis.platform.security.SecurityConfig;
 import java.time.Instant;
 import java.util.List;
@@ -35,10 +36,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({AdminApiController.class, AdminWebController.class})
 @Import({SecurityConfig.class, AdminApiControllerTests.TestUsers.class})
+@ActiveProfiles("test")
 class AdminApiControllerTests {
 
   @Autowired private MockMvc mockMvc;
@@ -48,6 +51,7 @@ class AdminApiControllerTests {
   @MockBean private OcppCommandRecordRepository commandRepository;
   @MockBean private OcppMessageRecordRepository messageRepository;
   @MockBean private AdminCommandGateway adminCommandGateway;
+  @MockBean private MfaService mfaService;
 
   @Test
   void redirectsAdminRootToStaticIndex() throws Exception {
@@ -93,6 +97,7 @@ class AdminApiControllerTests {
 
   @Test
   void allowsAdminToSubmitCommandsUsingExistingContracts() throws Exception {
+    when(mfaService.hasValidStepUp(eq("ops-admin"), any())).thenReturn(true);
     when(adminCommandGateway.submit(any(AdminCommandRequest.class), eq("ops-admin")))
         .thenReturn(
             new AdminCommandResult(
@@ -108,6 +113,7 @@ class AdminApiControllerTests {
         .perform(
             post("/admin/api/commands")
                 .with(httpBasic("ops-admin", "password"))
+                .header("X-Step-Up-Token", "step-up-token")
                 .contentType("application/json")
                 .content(
                     """

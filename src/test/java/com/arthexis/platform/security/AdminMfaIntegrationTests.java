@@ -8,8 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.arthexis.platform.app.admin.AdminCommandGateway;
 import com.arthexis.platform.app.admin.AdminCommandResult;
+import com.arthexis.platform.app.admin.AdminCommandStatus;
+import com.arthexis.platform.ocpp.OcppCommandDispatchService;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import javax.crypto.Mac;
@@ -31,14 +32,20 @@ class AdminMfaIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private AdminCommandGateway adminCommandGateway;
+  @MockBean private OcppCommandDispatchService commandDispatchService;
 
   @BeforeEach
   void setup() {
-    when(adminCommandGateway.submit(any(), anyString()))
+    when(commandDispatchService.submit(any(), anyString()))
         .thenReturn(
             new AdminCommandResult(
-                "cmd-1", "station-1", "smartCharging", "setChargingProfile", "accepted", "ok", Instant.now()));
+                "cmd-1",
+                "station-1",
+                "smartCharging",
+                "setChargingProfile",
+                AdminCommandStatus.ACKNOWLEDGED,
+                "ok",
+                Instant.now()));
   }
 
   @Test
