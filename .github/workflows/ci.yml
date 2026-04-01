@@ -99,8 +99,19 @@ jobs:
             }
       - name: Fail workflow if tests failed
         if: steps.run_tests.outputs.status != '0'
+        shell: bash
         run: |
-          echo "Test suite failed"
+          echo "::error::Test suite failed. Showing the last captured error lines."
+          if [ -f ci-test.log ]; then
+            echo "----- [ERROR] lines from ci-test.log (last 60) -----"
+            if grep -q "\[ERROR\]" ci-test.log; then
+              grep "\[ERROR\]" ci-test.log | tail -n 60
+            else
+              tail -n 60 ci-test.log
+            fi
+          else
+            echo "ci-test.log was not found."
+          fi
           exit 1
 
   build:
@@ -449,6 +460,12 @@ jobs:
             }
       - name: Fail workflow if screenshot capture failed
         if: steps.capture_screenshots.outputs.status != '0'
+        shell: bash
         run: |
-          echo "UI screenshot capture failed"
+          echo "::error::UI screenshot capture failed. Showing captured output."
+          if [ -f ci-ui-screenshots.log ]; then
+            tail -n 120 ci-ui-screenshots.log
+          else
+            echo "ci-ui-screenshots.log was not found."
+          fi
           exit 1
