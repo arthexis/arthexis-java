@@ -206,10 +206,6 @@ class OcaOcppBridgeStatusNotificationTests {
 
   @Test
   void handlesMalformedOcpp2xAuthorizeWithoutThrowing() {
-    when(rfidAuthorizationGateway.authorize(any(), any()))
-        .thenReturn(
-            new AuthorizationDecision(false, "Invalid", "ACCOUNT_LOGIN", null, null, "rfid_card_unknown"));
-
     OcppBridgeResponse response =
         bridgeService.handleIncoming(
             "session-2x",

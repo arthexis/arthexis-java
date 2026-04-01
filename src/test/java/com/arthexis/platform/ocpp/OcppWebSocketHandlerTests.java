@@ -4,6 +4,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -56,16 +57,16 @@ class OcppWebSocketHandlerTests {
 
     verify(commandDispatchService)
         .failByMessageId(
-            "msg-123",
+            eq("msg-123"),
             argThat(
                 reason ->
                     reason.contains("ProtocolError") && reason.contains("Rejected by charger")));
     verify(auditService)
         .recordIncomingCallError(
-            "session-1",
-            callError,
-            null,
-            payload,
+            eq("session-1"),
+            eq(callError),
+            eq(null),
+            eq(payload),
             argThat(
                 reason ->
                     reason.contains("ProtocolError") && reason.contains("Rejected by charger")));

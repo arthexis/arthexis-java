@@ -84,6 +84,12 @@ public class OcaOcppBridgeService {
       }
       case "Authorize" -> {
         String cardUid = resolveCardUid(payload);
+        if (cardUid == null || cardUid.isBlank()) {
+          AuthorizationDecision invalidDecision =
+              new AuthorizationDecision(
+                  false, "Invalid", "ACCOUNT_LOGIN", null, null, "missing_identifier");
+          yield response(stationId, authorizePayload(invalidDecision, payload));
+        }
         AuthorizationDecision decision = rfidAuthorizationService.authorize(stationId, cardUid);
         yield response(stationId, authorizePayload(decision, payload));
       }
