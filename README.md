@@ -10,7 +10,7 @@ This repository provides a Spring-based scaffold to mirror the Arthexis architec
 - **Task orchestration:** RabbitMQ + `@Scheduled` and `@Async` hooks (Quartz starter included)
 - **Security:** Spring Security + OAuth2 Resource Server baseline
 - **Observability:** Actuator + Prometheus + OpenTelemetry starter + JSON logs
-- **Ops/local topology:** Docker Compose for Postgres/Redis/RabbitMQ/Prometheus/Grafana
+- **Ops/local topology:** systemd-first services for Postgres/Redis/RabbitMQ, with optional Docker Compose
 - **Quality and tests:** JUnit 5, Spring Modulith tests, ArchUnit, Testcontainers dependencies
 
 ## Module Layout
@@ -45,15 +45,22 @@ To align local workflows with the Arthexis suite command model, this scaffold no
 ./bin/arthexis upgrade
 ```
 
-- `install` runs local dependency bootstrapping (`docker compose`) and full verification for a new install.
+- `install` runs local dependency bootstrapping (systemd by default, `--docker` optional) and full verification.
+- `install` accepts `--service '<prefix-%s>'` to resolve systemd service names in host-specific deployments.
+  If `%s` is omitted, `-%s` is appended automatically.
 - `upgrade` runs the Flyway upgrade-path verification test used by CI.
 - `verify` mirrors CI install modes (`new-install`, `upgrade-install`).
 
 ## Quick Start
 
 ```bash
-docker compose up -d postgres redis rabbitmq
-mvn spring-boot:run
+./bin/arthexis install
+```
+
+Optional Docker-backed quick start:
+
+```bash
+./bin/arthexis install --docker
 ```
 
 Use `SPRING_PROFILES_ACTIVE=h2` for local in-memory mode.
