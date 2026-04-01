@@ -175,6 +175,24 @@ class OcppCommandDispatchServiceTests {
   }
 
   @Test
+  void marksCommandFailedByMessageId() {
+    OcppCommandRecord command =
+        new OcppCommandRecord("CP-16", "EVSE", "Reset", "{}", "admin", 3);
+    command.markQueued(Instant.now(), Instant.now());
+    command.markSent("msg-9", Instant.now(), Instant.now().plusSeconds(20));
+
+    when(commandRepository.findByMessageIdAndStatus("msg-9", OcppCommandStatus.SENT))
+        .thenReturn(Optional.of(command));
+
+    service.failByMessageId("msg-9", "ProtocolError: rejected");
+
+    ArgumentCaptor<OcppCommandRecord> captor = ArgumentCaptor.forClass(OcppCommandRecord.class);
+    verify(commandRepository).save(captor.capture());
+    assertThat(captor.getValue().getStatus()).isEqualTo(OcppCommandStatus.FAILED);
+    assertThat(captor.getValue().getFailureReason()).isEqualTo("ProtocolError: rejected");
+  }
+
+  @Test
   void queuesCommandWhenSessionIsUnavailable() {
     AdminCommandRequest request =
         new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));

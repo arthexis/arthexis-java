@@ -61,6 +61,14 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
+    if ("CALLERROR".equals(incoming.messageType())) {
+      String errorDetail = incoming.payload() == null ? "Error" : incoming.payload().toString();
+      commandDispatchService.failByMessageId(incoming.messageId(), errorDetail);
+      sessionAuditService.recordIncomingCallError(
+          session.getId(), incoming, null, message.getPayload(), errorDetail);
+      return;
+    }
+
     OcppBridgeResponse bridgeResponse = ocaOcppBridgeService.handleIncoming(session.getId(), incoming);
     outboundSessionRouter.bindStationToSession(bridgeResponse.stationId(), session.getId());
     stateStore.bindStationSession(bridgeResponse.stationId(), session.getId());

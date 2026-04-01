@@ -120,6 +120,21 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
             });
   }
 
+  @Transactional
+  public void failByMessageId(String messageId, String reason) {
+    if (blank(messageId)) {
+      return;
+    }
+    commandRepository
+        .findByMessageIdAndStatus(messageId, OcppCommandStatus.SENT)
+        .ifPresent(
+            command -> {
+              command.markFailed(Instant.now(), blank(reason) ? "Charger rejected command" : reason);
+              commandRepository.save(command);
+              publishFromRecord(command, command.getFailureReason());
+            });
+  }
+
   @Scheduled(fixedDelayString = "${arthexis.ocpp.commands.scheduler-delay-ms:5000}")
   @Transactional
   public void processQueue() {

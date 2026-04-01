@@ -71,6 +71,20 @@ public class OcppSessionAuditService {
     }
   }
 
+  public void recordIncomingCallError(
+      String sessionId, OcppMessage incoming, String stationId, String rawPayload, String errorDetail) {
+    recordMessage(
+        sessionId,
+        stationId,
+        "INBOUND",
+        incoming.messageType(),
+        incoming.action(),
+        incoming.messageId(),
+        rawPayload,
+        "PARSED",
+        errorDetail == null || errorDetail.isBlank() ? "Error" : errorDetail);
+  }
+
   public void recordIncomingParseFailure(String sessionId, String rawPayload) {
     recordMessage(
         sessionId,
