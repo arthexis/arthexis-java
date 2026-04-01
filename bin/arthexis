@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'USAGE'
+Arthexis Java CLI
+
+Usage:
+  ./bin/arthexis install [--h2] [--with-observability]
+  ./bin/arthexis upgrade
+  ./bin/arthexis verify [new-install|upgrade-install]
+  ./bin/arthexis run [--h2]
+  ./bin/arthexis help
+
+Commands:
+  install   Start local dependencies and run full verification for a new install.
+  upgrade   Run Flyway upgrade-path verification.
+  verify    Run install/upgrade verification used by CI.
+  run       Start the app via Maven (optionally with in-memory H2 profile).
+  help      Show this help.
+USAGE
+}
+
+ensure_repo_root() {
+  if [[ ! -f "$ROOT_DIR/pom.xml" ]]; then
+    echo "error: pom.xml not found from $ROOT_DIR" >&2
+    exit 1
+  fi
+}
+
+run_install() {
+  local use_h2=false
+  local with_observability=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --h2)
+        use_h2=true
+        shift
+        ;;
+      --with-observability)
+        with_observability=true
+        shift
+        ;;
+      *)
+        echo "error: unknown option for install: $1" >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
+
+  pushd "$ROOT_DIR" >/dev/null
+  docker compose up -d postgres redis rabbitmq
+  if [[ "$with_observability" == "true" ]]; then
+    docker compose up -d prometheus grafana
+  fi
+
+  mvn -B verify
+
+  if [[ "$use_h2" == "true" ]]; then
+    SPRING_PROFILES_ACTIVE=h2 mvn -B spring-boot:run
+  else
+    mvn -B spring-boot:run
+  fi
+  popd >/dev/null
+}
+
+run_upgrade() {
+  pushd "$ROOT_DIR" >/dev/null
+  mvn -B -Dtest=FlywayUpgradePathTests test
+  popd >/dev/null
+}
+
+run_verify() {
+  local mode="${1:-new-install}"
+  pushd "$ROOT_DIR" >/dev/null
+  case "$mode" in
+    new-install)
+      mvn -B verify
+      ;;
+    upgrade-install)
+      mvn -B -Dtest=FlywayUpgradePathTests test
+      ;;
+    *)
+      echo "error: verify mode must be one of: new-install, upgrade-install" >&2
+      exit 1
+      ;;
+  esac
+  popd >/dev/null
+}
+
+run_app() {
+  local use_h2=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --h2)
+        use_h2=true
+        shift
+        ;;
+      *)
+        echo "error: unknown option for run: $1" >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
+
+  pushd "$ROOT_DIR" >/dev/null
+  if [[ "$use_h2" == "true" ]]; then
+    SPRING_PROFILES_ACTIVE=h2 mvn -B spring-boot:run
+  else
+    mvn -B spring-boot:run
+  fi
+  popd >/dev/null
+}
+
+main() {
+  ensure_repo_root
+  local command="${1:-help}"
+  shift || true
+
+  case "$command" in
+    install)
+      run_install "$@"
+      ;;
+    upgrade)
+      run_upgrade
+      ;;
+    verify)
+      run_verify "$@"
+      ;;
+    run)
+      run_app "$@"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      echo "error: unknown command: $command" >&2
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

@@ -1,6 +1,6 @@
 # Install Guide
 
-This guide explains how to install and run the Arthexis Java scaffold locally.
+This guide explains how to install and run the Arthexis Java scaffold locally. It now includes Arthexis-style CLI command surfaces for install and upgrade workflows.
 
 ## 1) Prerequisites
 
@@ -67,7 +67,28 @@ git clone <your-fork-or-repo-url>
 cd arthexis-java
 ```
 
-## 3) Start infrastructure services (Postgres, Redis, RabbitMQ)
+## 3) Use the Arthexis-style CLI surfaces
+
+The repository includes `./bin/arthexis` with command surfaces aligned to Arthexis workflows:
+
+```bash
+./bin/arthexis help
+./bin/arthexis install
+./bin/arthexis upgrade
+```
+
+- `install` starts Docker dependencies, runs full `mvn -B verify`, then starts the app.
+- `upgrade` executes Flyway upgrade validation (`FlywayUpgradePathTests`) like CI.
+- `verify` accepts `new-install` or `upgrade-install`.
+
+Optional flags:
+
+```bash
+./bin/arthexis install --with-observability
+./bin/arthexis run --h2
+```
+
+## 4) Start infrastructure services (Postgres, Redis, RabbitMQ)
 
 From the repository root:
 
@@ -81,7 +102,7 @@ Optional observability stack (Prometheus + Grafana):
 docker compose up -d prometheus grafana
 ```
 
-## 4) Run the application
+## 5) Run the application
 
 ```bash
 mvn spring-boot:run
@@ -89,7 +110,7 @@ mvn spring-boot:run
 
 The app starts with the default Spring profile and connects to the Docker-backed services.
 
-## 5) Alternative local mode: in-memory H2
+## 6) Alternative local mode: in-memory H2
 
 If you want to run without Postgres, enable the `h2` profile:
 
@@ -107,7 +128,7 @@ $env:SPRING_PROFILES_ACTIVE = "h2"
 mvn spring-boot:run
 ```
 
-## 6) Optional security configuration (JWT issuer)
+## 7) Optional security configuration (JWT issuer)
 
 If you want OAuth2 resource-server validation enabled, set:
 
@@ -125,7 +146,7 @@ $env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI = "http://localhost:80
 
 Then run the app as usual.
 
-## 7) Optional telemetry configuration (OpenTelemetry)
+## 8) Optional telemetry configuration (OpenTelemetry)
 
 OpenTelemetry SDK autoconfiguration is disabled by default for local convenience.
 Enable it when your telemetry backend is available:
@@ -142,7 +163,7 @@ export OTEL_SDK_DISABLED=false
 $env:OTEL_SDK_DISABLED = "false"
 ```
 
-## 8) Verify the install
+## 9) Verify the install
 
 Run the test suite:
 

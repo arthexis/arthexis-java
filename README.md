@@ -35,6 +35,20 @@ This scaffold now has explicit build-target support for **Raspberry Pi 4 Model B
 
 The CI pipeline executes ARM64 compatibility checks in both Debian and Ubuntu container images to validate Arthexis Java build/test paths for Raspberry Pi-class environments.
 
+## Arthexis-style CLI Surfaces
+
+To align local workflows with the Arthexis suite command model, this scaffold now includes a small wrapper CLI:
+
+```bash
+./bin/arthexis help
+./bin/arthexis install
+./bin/arthexis upgrade
+```
+
+- `install` runs local dependency bootstrapping (`docker compose`) and full verification for a new install.
+- `upgrade` runs the Flyway upgrade-path verification test used by CI.
+- `verify` mirrors CI install modes (`new-install`, `upgrade-install`).
+
 ## Quick Start
 
 ```bash
