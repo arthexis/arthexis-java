@@ -142,7 +142,14 @@ class OcaOcppBridgeServiceTests {
                     "chargingStation", Map.of("serialNumber", "CP-2X"),
                     "idToken", Map.of("idToken", "CARD-2X"))));
 
-    assertThat(response.payload()).containsEntry("idTokenInfo", Map.of("status", "Accepted", "customData", Map.of("authMode", "RFID", "reason", "ok")));
+    assertThat(response.payload())
+        .containsEntry(
+            "idTokenInfo",
+            Map.of(
+                "status",
+                "Accepted",
+                "customData",
+                Map.of("authMode", "RFID", "reason", "ok")));
     assertThat(response.payload()).containsEntry("customData", Map.of("accountExternalId", "acct-2x", "cardUid", "CARD-2X"));
   }
 
@@ -191,7 +198,7 @@ class OcaOcppBridgeServiceTests {
 
   @Test
   void authorizeMissingTokenReturnsInvalidStatus() {
-    when(rfidAuthorizationGateway.authorize("CP-16", ""))
+    when(rfidAuthorizationGateway.authorize("CP-16", null))
         .thenReturn(
             new AuthorizationDecision(
                 false, "Invalid", "ACCOUNT_LOGIN", null, null, "rfid_card_unknown"));
