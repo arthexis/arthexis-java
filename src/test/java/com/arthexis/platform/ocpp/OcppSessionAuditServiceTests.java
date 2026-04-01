@@ -65,4 +65,27 @@ class OcppSessionAuditServiceTests {
     assertThat(saved.getResultStatus()).isEqualTo("ProtocolError: Rejected by charger");
     assertThat(saved.getPayloadSnapshot()).isEqualTo(rawPayload);
   }
+
+  @Test
+  void truncatesCallErrorResultStatusToDatabaseLimit() {
+    OcppSessionRecord sessionRecord = new OcppSessionRecord("session-1", Instant.now());
+    sessionRecord.setStationId("CP-100");
+
+    when(sessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(sessionRecord));
+    when(sessionRepository.save(any(OcppSessionRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    OcppMessage callError = new OcppMessage("CALLERROR", "msg-654", "Reset", Map.of("errorCode", "ProtocolError"));
+    String rawPayload =
+        "{\"messageType\":\"CALLERROR\",\"messageId\":\"msg-654\",\"action\":\"Reset\",\"payload\":{\"errorCode\":\"ProtocolError\"}}";
+    String longDetail = "D".repeat(90);
+
+    service.recordIncomingCallError("session-1", callError, "CP-100", rawPayload, longDetail);
+
+    ArgumentCaptor<OcppMessageRecord> captor = ArgumentCaptor.forClass(OcppMessageRecord.class);
+    verify(messageRepository).save(captor.capture());
+
+    OcppMessageRecord saved = captor.getValue();
+    assertThat(saved.getResultStatus()).hasSize(64);
+    assertThat(saved.getResultStatus()).endsWith("...");
+  }
 }

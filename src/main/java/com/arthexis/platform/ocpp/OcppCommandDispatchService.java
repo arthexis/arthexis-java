@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OcppCommandDispatchService implements AdminCommandGateway {
 
+  private static final int FAILURE_REASON_MAX_LENGTH = 512;
+
   private final OcppCommandRecordRepository commandRepository;
   private final OcppOutboundSessionRouter sessionRouter;
   private final OcppSessionStateStore stateStore;
@@ -129,10 +131,19 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
         .findByMessageIdAndStatus(messageId, OcppCommandStatus.SENT)
         .ifPresent(
             command -> {
-              command.markFailed(Instant.now(), blank(reason) ? "Charger rejected command" : reason);
+              command.markFailed(
+                  Instant.now(),
+                  truncateFailureReason(
+                      blank(reason) ? "Charger rejected command" : reason.trim()));
               commandRepository.save(command);
               publishFromRecord(command, command.getFailureReason());
             });
+  }
+
+  private String truncateFailureReason(String reason) {
+    return reason.length() <= FAILURE_REASON_MAX_LENGTH
+        ? reason
+        : reason.substring(0, FAILURE_REASON_MAX_LENGTH);
   }
 
   @Scheduled(fixedDelayString = "${arthexis.ocpp.commands.scheduler-delay-ms:5000}")
