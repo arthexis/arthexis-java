@@ -28,6 +28,7 @@ jobs:
         run: mvn -B test
 
   build:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -130,6 +131,7 @@ jobs:
           exit 1
 
   rpi-compat:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: rpi-compat (${{ matrix.distro }} / ${{ matrix.install_mode }})
     runs-on: ubuntu-latest
     permissions:
