@@ -4,9 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -80,7 +81,7 @@ public class OcppFrameCodec {
         Map.of(
             "errorCode", errorCode,
             "errorDescription", errorDescription,
-            "errorDetails", errorDetails));
+            "errorDetails", errorDetails == null ? Map.of() : errorDetails));
   }
 
   private Object toWireFrame(OcppMessage message) {
@@ -98,9 +99,10 @@ public class OcppFrameCodec {
     if (message.payload() instanceof Map<?, ?> payload) {
       @SuppressWarnings("unchecked")
       Map<String, Object> castedPayload = (Map<String, Object>) payload;
-      Object errorCode = castedPayload.getOrDefault("errorCode", "InternalError");
-      Object errorDescription = castedPayload.getOrDefault("errorDescription", "Unhandled error");
-      Object errorDetails = castedPayload.getOrDefault("errorDetails", Map.of());
+      Object errorCode = Objects.requireNonNullElse(castedPayload.get("errorCode"), "InternalError");
+      Object errorDescription =
+          Objects.requireNonNullElse(castedPayload.get("errorDescription"), "Unhandled error");
+      Object errorDetails = Objects.requireNonNullElse(castedPayload.get("errorDetails"), Map.of());
       return listOf(4, message.messageId(), errorCode, errorDescription, errorDetails);
     }
     return listOf(
@@ -112,11 +114,7 @@ public class OcppFrameCodec {
   }
 
   private List<Object> listOf(Object... values) {
-    List<Object> list = new ArrayList<>(values.length);
-    for (Object value : values) {
-      list.add(value);
-    }
-    return list;
+    return Arrays.asList(values);
   }
 
   private String normalizeType(String rawType) {
