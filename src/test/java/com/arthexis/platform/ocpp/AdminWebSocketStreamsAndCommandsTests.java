@@ -12,7 +12,11 @@ import com.arthexis.platform.app.admin.AdminWebSocketDomainEventBridge;
 import com.arthexis.platform.app.admin.ConnectorChangedEvent;
 import com.arthexis.platform.app.admin.OcppMessagePersistedEvent;
 import com.arthexis.platform.app.admin.StationStatusChangedEvent;
+import com.arthexis.platform.billing.BillingSessionRatedEvent;
+import com.arthexis.platform.firmware.FirmwareRolloutStatusChangedEvent;
 import com.arthexis.platform.telemetry.TelemetrySummaryEvent;
+import com.arthexis.platform.users.UserIdentityMetadataChangedEvent;
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +46,23 @@ class AdminWebSocketStreamsAndCommandsTests {
     bridge.onSessionEvent(
         new OcppMessagePersistedEvent(
             "CP-ADMIN-1", "session-1", "OUTBOUND", "BootNotification", "PARSED", "Accepted", Instant.now()));
+    bridge.onUserIdentityMetadataChanged(
+        new UserIdentityMetadataChangedEvent(
+            "tenant-a", "account-a", "operator-a", "customer-a", "ACTIVE", Instant.now()));
+    bridge.onBillingSessionRated(
+        new BillingSessionRatedEvent(
+            "session-1",
+            "CP-ADMIN-1",
+            "tenant-a",
+            "account-a",
+            4200,
+            new BigDecimal("12.50"),
+            "USD",
+            true,
+            Instant.now()));
+    bridge.onFirmwareRolloutStatusChanged(
+        new FirmwareRolloutStatusChangedEvent(
+            "camp-1", "CP-ADMIN-1", "tenant-a", "2.0.3", "IN_PROGRESS", Instant.now()));
 
     assertThat(channel.payloads)
         .extracting(AdminRealtimePayload::eventType)
@@ -49,7 +70,10 @@ class AdminWebSocketStreamsAndCommandsTests {
             "station.status.changed",
             "connector.changed",
             "telemetry.summary",
-            "session.message.persisted");
+            "session.message.persisted",
+            "users.identity.metadata.changed",
+            "billing.session.rated",
+            "firmware.rollout.status.changed");
   }
 
   @Test
