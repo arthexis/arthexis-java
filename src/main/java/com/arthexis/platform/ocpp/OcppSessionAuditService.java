@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 public class OcppSessionAuditService {
 
   private static final int PAYLOAD_SNAPSHOT_LIMIT = 8000;
+  private static final int RESULT_STATUS_MAX_LENGTH = 64;
 
   private final OcppSessionRecordRepository sessionRepository;
   private final OcppMessageRecordRepository messageRepository;
@@ -69,6 +70,20 @@ public class OcppSessionAuditService {
     if ("StatusNotification".equals(incoming.action())) {
       publishConnectorChanged(stationId, incoming.payload());
     }
+  }
+
+  public void recordIncomingCallError(
+      String sessionId, OcppMessage incoming, String stationId, String rawPayload, String errorDetail) {
+    recordMessage(
+        sessionId,
+        stationId,
+        "INBOUND",
+        incoming.messageType(),
+        incoming.action(),
+        incoming.messageId(),
+        rawPayload,
+        "PARSED",
+        truncateResultStatus(errorDetail == null || errorDetail.isBlank() ? "Error" : errorDetail.trim()));
   }
 
   public void recordIncomingParseFailure(String sessionId, String rawPayload) {
@@ -202,6 +217,13 @@ public class OcppSessionAuditService {
       }
     }
     return null;
+  }
+
+  private String truncateResultStatus(String resultStatus) {
+    if (resultStatus.length() <= RESULT_STATUS_MAX_LENGTH) {
+      return resultStatus;
+    }
+    return resultStatus.substring(0, RESULT_STATUS_MAX_LENGTH - 3) + "...";
   }
 
   private String payloadToString(Object payload) {
