@@ -1,6 +1,9 @@
 package com.arthexis.platform.ocpp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.arthexis.platform.auth.AuthorizationDecision;
@@ -209,5 +212,88 @@ class OcaOcppBridgeServiceTests {
             new OcppMessage("2", "msg-auth-missing", "Authorize", Map.of("stationId", "CP-16")));
 
     assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Invalid")));
+  }
+
+  @Test
+  void startTransactionLegacyActionUpdatesConnectorAndStationState() {
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-start",
+            new OcppMessage(
+                "2",
+                "msg-start-16",
+                "StartTransaction",
+                Map.of(
+                    "stationId",
+                    "CP-16",
+                    "connectorId",
+                    2,
+                    "idTag",
+                    "CARD-16",
+                    "meterStart",
+                    100,
+                    "transactionId",
+                    55)));
+
+    verify(connectorStateService)
+        .upsertConnectorState(eq("CP-16"), eq(1), eq(2), eq("CHARGING"), eq(""), eq("Operative"), any());
+    verify(chargingStationService).upsertStatus(eq("CP-16"), eq("CHARGING"), any());
+    assertThat(response.payload())
+        .isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted"), "transactionId", 55));
+  }
+
+  @Test
+  void stopTransactionLegacyActionUpdatesConnectorAndStationState() {
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-stop",
+            new OcppMessage(
+                "2",
+                "msg-stop-16",
+                "StopTransaction",
+                Map.of("stationId", "CP-16", "connectorId", 2, "meterStop", 125, "transactionId", 55)));
+
+    verify(connectorStateService)
+        .upsertConnectorState(eq("CP-16"), eq(1), eq(2), eq("AVAILABLE"), eq(""), eq("Operative"), any());
+    verify(chargingStationService).upsertStatus(eq("CP-16"), eq("AVAILABLE"), any());
+    assertThat(response.payload()).isEqualTo(Map.of("idTagInfo", Map.of("status", "Accepted")));
+  }
+
+  @Test
+  void changeConfigurationStoresPendingCommandAndReturnsAccepted() {
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-cfg",
+            new OcppMessage(
+                "2",
+                "msg-change-cfg",
+                "ChangeConfiguration",
+                Map.of("stationId", "CP-16", "key", "HeartbeatInterval", "value", "120")));
+
+    verify(chargingStationService).upsertStatus(eq("CP-16"), eq("ONLINE"), any());
+    verify(stateStore).storePendingCommand("CP-16", "msg-change-cfg", "ChangeConfiguration");
+    assertThat(response.payload())
+        .isEqualTo(Map.of("status", "Accepted", "key", "HeartbeatInterval"));
+  }
+
+  @Test
+  void getConfigurationReturnsCompatibilityShape() {
+    OcppBridgeResponse response =
+        bridgeService.handleIncoming(
+            "session-cfg",
+            new OcppMessage(
+                "2",
+                "msg-get-cfg",
+                "GetConfiguration",
+                Map.of("stationId", "CP-16", "key", List.of("HeartbeatInterval"))));
+
+    verify(chargingStationService).upsertStatus(eq("CP-16"), eq("ONLINE"), any());
+    assertThat(response.payload())
+        .isEqualTo(
+            Map.of(
+                "configurationKey",
+                List.of(Map.of("key", "HeartbeatInterval", "readonly", false)),
+                "unknownKey",
+                List.of()));
   }
 }

@@ -7,6 +7,8 @@ import com.arthexis.platform.charging.ChargingStationAdminDetails;
 import com.arthexis.platform.charging.ChargingStationService;
 import com.arthexis.platform.telemetry.TelemetryIngestionService;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -101,6 +103,48 @@ public class OcaOcppBridgeService {
           chargingStationService.upsertStatus(stationId, "AVAILABLE");
         }
         yield response(stationId, accepted());
+      }
+      case "StartTransaction" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeStartTransaction(stationId, payload);
+        int connectorId = intValue(normalized.get("connectorId"), 1);
+        connectorStateService.upsertConnectorState(
+            stationId, 1, connectorId, "CHARGING", "", "Operative", Instant.now());
+        chargingStationService.upsertStatus(stationId, "CHARGING", buildAdminDetails(payload, false));
+        yield response(
+            stationId,
+            Map.of(
+                "idTagInfo",
+                Map.of("status", "Accepted"),
+                "transactionId",
+                intValue(normalized.get("transactionId"), 1)));
+      }
+      case "StopTransaction" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeStopTransaction(stationId, payload);
+        int connectorId = intValue(normalized.get("connectorId"), 1);
+        connectorStateService.upsertConnectorState(
+            stationId, 1, connectorId, "AVAILABLE", "", "Operative", Instant.now());
+        chargingStationService.upsertStatus(stationId, "AVAILABLE", buildAdminDetails(payload, false));
+        yield response(stationId, Map.of("idTagInfo", Map.of("status", "Accepted")));
+      }
+      case "ChangeConfiguration" -> {
+        Map<String, Object> normalized =
+            payloadNormalizer.normalizeChangeConfiguration(stationId, payload);
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        stateStore.storePendingCommand(stationId, incoming.messageId(), incoming.action());
+        yield response(
+            stationId,
+            Map.of("status", "Accepted", "key", stringValue(normalized.get("key"))));
+      }
+      case "GetConfiguration" -> {
+        Map<String, Object> normalized = payloadNormalizer.normalizeGetConfiguration(stationId, payload);
+        chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
+        yield response(
+            stationId,
+            Map.of(
+                "configurationKey",
+                mapConfigurationKeys(normalized.get("key")),
+                "unknownKey",
+                List.of()));
       }
       case "DiagnosticsStatusNotification" -> {
         chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
@@ -305,5 +349,20 @@ public class OcaOcppBridgeService {
 
   private Map<String, Object> accepted() {
     return Map.of("status", "Accepted");
+  }
+
+  private List<Map<String, Object>> mapConfigurationKeys(Object keys) {
+    if (!(keys instanceof List<?> list) || list.isEmpty()) {
+      return List.of();
+    }
+    return list.stream()
+        .map(
+            value -> {
+              Map<String, Object> configuration = new LinkedHashMap<>();
+              configuration.put("key", stringValue(value));
+              configuration.put("readonly", false);
+              return configuration;
+            })
+        .toList();
   }
 }

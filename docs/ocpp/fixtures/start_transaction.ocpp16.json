@@ -1,0 +1,33 @@
+{
+  "name": "start_transaction_ocpp16_legacy",
+  "action": "StartTransaction",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-start-16",
+  "payload": {
+    "stationId": "CP-16-START",
+    "connectorId": 2,
+    "idTag": "CARD-16",
+    "meterStart": 1050,
+    "timestamp": "2026-03-31T01:10:00Z",
+    "transactionId": 88
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-START",
+    "normalized": {
+      "stationId": "CP-16-START",
+      "connectorId": 2,
+      "idTag": "CARD-16",
+      "meterStart": 1050,
+      "timestamp": "2026-03-31T01:10:00Z",
+      "transactionId": "88"
+    },
+    "types": {
+      "stationId": "string",
+      "connectorId": "number",
+      "idTag": "string",
+      "meterStart": "number",
+      "timestamp": "string",
+      "transactionId": "string"
+    }
+  }
+}
