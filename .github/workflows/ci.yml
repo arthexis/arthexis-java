@@ -59,8 +59,7 @@ jobs:
             const raw = process.env.ERROR_MESSAGE || 'No test error details captured.';
             const maxLength = 60000;
             const content = raw.length > maxLength
-              ? `${raw.slice(0, maxLength)}
-... (truncated)`
+              ? `${raw.slice(0, maxLength)}\n... (truncated)`
               : raw;
             const prNumber = context.issue.number;
             const body = `${marker}
@@ -105,7 +104,11 @@ jobs:
           exit 1
 
   build:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: tests
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && needs.tests.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -404,8 +407,7 @@ jobs:
             const raw = process.env.ERROR_MESSAGE || 'No screenshot error details captured.';
             const maxLength = 60000;
             const content = raw.length > maxLength
-              ? `${raw.slice(0, maxLength)}
-... (truncated)`
+              ? `${raw.slice(0, maxLength)}\n... (truncated)`
               : raw;
             const prNumber = context.issue.number;
             const body = `${marker}
