@@ -20,7 +20,19 @@ public class StationPollJob {
 
   @Scheduled(fixedDelayString = "${arthexis.jobs.station-poll-delay-ms:60000}")
   public void enqueueStationPollingSweep() {
-    rabbitTemplate.convertAndSend("arthexis.jobs", "station.poll", "poll-all");
-    logger.info("Queued station polling sweep job");
+    String jobId = java.util.UUID.randomUUID().toString();
+    rabbitTemplate.convertAndSend(
+        "arthexis.jobs",
+        "station.poll",
+        "all",
+        message -> {
+          message.getMessageProperties().setHeader("x-job-id", jobId);
+          message.getMessageProperties().setHeader("x-job-type", "station.poll");
+          message.getMessageProperties().setHeader("x-station-scope", "all");
+          message.getMessageProperties().setHeader("x-idempotency-key", "station.poll:" + jobId);
+          message.getMessageProperties().setHeader("x-attempt", 1);
+          return message;
+        });
+    logger.info("Queued station polling sweep job jobId={}", jobId);
   }
 }
