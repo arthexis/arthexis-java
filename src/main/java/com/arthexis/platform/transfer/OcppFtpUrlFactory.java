@@ -1,6 +1,7 @@
 package com.arthexis.platform.transfer;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Locale;
 import org.springframework.stereotype.Component;
 
@@ -23,15 +24,18 @@ public class OcppFtpUrlFactory {
                 () -> new IllegalArgumentException("No FTP binding configured for charger: " + chargerId));
     String normalizedPath = normalize(relativePath);
     String path = String.format("/%s/%s", chargerId, normalizedPath);
-    return URI.create(
-        String.format(
-            Locale.ROOT,
-            "ftp://%s:%s@%s:%d%s",
-            binding.username(),
-            binding.password(),
-            properties.publicHost(),
-            properties.port(),
-            path));
+    try {
+      return new URI(
+          "ftp",
+          String.format(Locale.ROOT, "%s:%s", binding.username(), binding.password()),
+          properties.publicHost(),
+          properties.port(),
+          path,
+          null,
+          null);
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException("Failed to build FTP URI", e);
+    }
   }
 
   private String normalize(String relativePath) {

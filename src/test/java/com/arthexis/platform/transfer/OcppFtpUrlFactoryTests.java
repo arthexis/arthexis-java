@@ -50,4 +50,28 @@ class OcppFtpUrlFactoryTests {
     assertThatThrownBy(() -> factory.buildDownloadUrl("cp-1", "../escape.bin"))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void encodesSpecialCharactersInCredentials() {
+    OcppFtpServerProperties properties = new OcppFtpServerProperties();
+    properties.setPublicHost("ftp.arthexis.local");
+    properties.setPort(2211);
+
+    OcppFtpServerProperties.Binding binding = new OcppFtpServerProperties.Binding();
+    binding.setId("north-yard");
+    binding.setUsername("north@ops");
+    binding.setPassword("p:as/s");
+    binding.setChargerIds(List.of("cp-ny-01"));
+    properties.setBindings(List.of(binding));
+
+    OcppFtpBindingRegistry registry = new OcppFtpBindingRegistry(properties);
+    registry.initialize();
+
+    OcppFtpUrlFactory factory = new OcppFtpUrlFactory(properties, registry);
+    URI url = factory.buildDownloadUrl("cp-ny-01", "firmware/arthexis-1.2.3.bin");
+
+    assertThat(url.toASCIIString())
+        .isEqualTo(
+            "ftp://north%40ops:p%3Aas%2Fs@ftp.arthexis.local:2211/cp-ny-01/firmware/arthexis-1.2.3.bin");
+  }
 }

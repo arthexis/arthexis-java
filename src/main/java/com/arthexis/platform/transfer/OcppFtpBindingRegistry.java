@@ -22,11 +22,17 @@ public class OcppFtpBindingRegistry {
   void initialize() {
     byBindingId.clear();
     byChargerId.clear();
+    Map<String, OcppFtpServerProperties.Binding> byUsername = new HashMap<>();
     for (OcppFtpServerProperties.Binding binding : properties.bindings()) {
+      validateSegment(binding.id(), "binding id");
+      if (byUsername.putIfAbsent(binding.username(), binding) != null) {
+        throw new IllegalArgumentException("Duplicate FTP binding username: " + binding.username());
+      }
       if (byBindingId.putIfAbsent(binding.id(), binding) != null) {
         throw new IllegalArgumentException("Duplicate FTP binding id: " + binding.id());
       }
       for (String chargerId : binding.chargerIds()) {
+        validateSegment(chargerId, "charger id");
         OcppFtpServerProperties.Binding existing = byChargerId.putIfAbsent(chargerId, binding);
         if (existing != null) {
           throw new IllegalArgumentException(
@@ -36,6 +42,12 @@ public class OcppFtpBindingRegistry {
                   + binding.id());
         }
       }
+    }
+  }
+
+  private void validateSegment(String value, String fieldName) {
+    if (value == null || value.isBlank() || value.contains("..")) {
+      throw new IllegalArgumentException("Invalid FTP " + fieldName + ": " + value);
     }
   }
 

@@ -3,6 +3,9 @@ package com.arthexis.platform.transfer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.ftpserver.FtpServer;
 import org.apache.ftpserver.FtpServerConfigurationException;
 import org.apache.ftpserver.FtpServerFactory;
@@ -63,26 +66,28 @@ public class OcppFtpServerLifecycle {
   static class InMemoryOcppUserManager implements UserManager {
 
     private final OcppFtpServerProperties properties;
-    private final OcppFtpBindingRegistry bindingRegistry;
+    private final Map<String, OcppFtpServerProperties.Binding> byUsername;
 
     InMemoryOcppUserManager(
         OcppFtpServerProperties properties, OcppFtpBindingRegistry bindingRegistry) {
       this.properties = properties;
-      this.bindingRegistry = bindingRegistry;
+      this.byUsername =
+          bindingRegistry.allBindings().stream()
+              .peek(this::prepareHome)
+              .collect(
+                  Collectors.toUnmodifiableMap(
+                      OcppFtpServerProperties.Binding::username, Function.identity()));
     }
 
     @Override
     public User getUserByName(String username) {
-      return bindingRegistry.allBindings().stream()
-          .filter(binding -> binding.username().equals(username))
-          .findFirst()
-          .map(this::toUser)
-          .orElse(null);
+      OcppFtpServerProperties.Binding binding = byUsername.get(username);
+      return binding == null ? null : toUser(binding);
     }
 
     @Override
     public String[] getAllUserNames() {
-      return bindingRegistry.allBindings().stream().map(OcppFtpServerProperties.Binding::username).toArray(String[]::new);
+      return byUsername.keySet().toArray(String[]::new);
     }
 
     @Override
@@ -109,10 +114,10 @@ public class OcppFtpServerLifecycle {
         throw new AuthenticationFailedException("Unsupported FTP auth type");
       }
       OcppFtpServerProperties.Binding binding =
-          bindingRegistry.allBindings().stream()
-              .filter(candidate -> candidate.username().equals(passwordAuth.getUsername()))
-              .findFirst()
-              .orElseThrow(() -> new AuthenticationFailedException("Unknown FTP user"));
+          byUsername.get(passwordAuth.getUsername());
+      if (binding == null) {
+        throw new AuthenticationFailedException("Unknown FTP user");
+      }
       if (!binding.password().equals(passwordAuth.getPassword())) {
         throw new AuthenticationFailedException("Invalid FTP credentials");
       }
@@ -135,12 +140,12 @@ public class OcppFtpServerLifecycle {
       user.setPassword(binding.password());
       user.setEnabled(true);
       user.setAuthorities(java.util.List.of(new WritePermission(), new ConcurrentLoginPermission(0, 0)));
-      user.setHomeDirectory(prepareHome(binding));
+      user.setHomeDirectory(homeDirectory(binding).toString());
       return user;
     }
 
-    private String prepareHome(OcppFtpServerProperties.Binding binding) {
-      Path bindingRoot = properties.rootDirectory().resolve("bindings").resolve(binding.id());
+    private void prepareHome(OcppFtpServerProperties.Binding binding) {
+      Path bindingRoot = homeDirectory(binding);
       try {
         Files.createDirectories(bindingRoot);
         for (String chargerId : binding.chargerIds()) {
@@ -149,7 +154,10 @@ public class OcppFtpServerLifecycle {
       } catch (IOException e) {
         throw new IllegalStateException("Unable to initialize FTP storage for binding " + binding.id(), e);
       }
-      return bindingRoot.toString();
+    }
+
+    private Path homeDirectory(OcppFtpServerProperties.Binding binding) {
+      return properties.rootDirectory().resolve("bindings").resolve(binding.id());
     }
   }
 }
