@@ -1,6 +1,7 @@
 package com.arthexis.platform.transfer;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.stereotype.Component;
@@ -30,15 +31,20 @@ public class OcppFtpUrlFactory {
             "%s:%s",
             encodeUserInfoComponent(binding.username()),
             encodeUserInfoComponent(binding.password()));
-    String uri =
-        String.format(
-            Locale.ROOT,
-            "ftp://%s@%s:%d%s",
-            encodedUserInfo,
-            properties.publicHost(),
-            properties.port(),
-            path);
-    return URI.create(uri);
+    try {
+      URI encodedPathUri =
+          new URI("ftp", null, properties.publicHost(), properties.port(), path, null, null);
+      String uri =
+          String.format(
+              Locale.ROOT,
+              "ftp://%s@%s%s",
+              encodedUserInfo,
+              encodedPathUri.getRawAuthority(),
+              encodedPathUri.getRawPath());
+      return URI.create(uri);
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException("Failed to build FTP URI", e);
+    }
   }
 
   private String encodeUserInfoComponent(String value) {
@@ -49,7 +55,10 @@ public class OcppFtpUrlFactory {
       if (isUnreserved(unsigned)) {
         encoded.append((char) unsigned);
       } else {
-        encoded.append(String.format(Locale.ROOT, "%%%02X", unsigned));
+        encoded.append('%');
+        char hi = Character.forDigit((unsigned >> 4) & 0xF, 16);
+        char lo = Character.forDigit(unsigned & 0xF, 16);
+        encoded.append(Character.toUpperCase(hi)).append(Character.toUpperCase(lo));
       }
     }
     return encoded.toString();
