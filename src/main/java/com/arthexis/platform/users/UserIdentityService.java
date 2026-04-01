@@ -1,6 +1,5 @@
 package com.arthexis.platform.users;
 
-import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +34,7 @@ public class UserIdentityService {
             persisted.getOperatorId(),
             persisted.getCustomerId(),
             persisted.getIdentityState(),
-            Instant.now()));
+            persisted.getUpdatedAt()));
 
     return persisted;
   }

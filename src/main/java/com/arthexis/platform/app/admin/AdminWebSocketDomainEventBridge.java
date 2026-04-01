@@ -79,7 +79,7 @@ public class AdminWebSocketDomainEventBridge {
 
     publish(
         new AdminRealtimePayload(
-            "users.identity.metadata.changed", event.accountId(), event.occurredAt(), details));
+            "users.identity.metadata.changed", null, event.occurredAt(), details));
   }
 
   @EventListener

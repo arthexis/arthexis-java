@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -35,4 +36,21 @@ public class FirmwareRolloutCampaign {
   private Instant createdAt;
 
   protected FirmwareRolloutCampaign() {}
+
+  public FirmwareRolloutCampaign(String campaignId, String tenantId, String targetVersion, String status) {
+    this.campaignId = campaignId;
+    this.tenantId = tenantId;
+    this.targetVersion = targetVersion;
+    this.status = status;
+    this.startedAt = Instant.now();
+  }
+
+  @PrePersist
+  void onCreate() {
+    Instant now = Instant.now();
+    if (startedAt == null) {
+      startedAt = now;
+    }
+    createdAt = now;
+  }
 }

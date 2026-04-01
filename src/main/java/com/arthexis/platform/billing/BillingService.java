@@ -1,7 +1,6 @@
 package com.arthexis.platform.billing;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +45,7 @@ public class BillingService {
             persisted.getRatedAmount(),
             persisted.getCurrency(),
             persisted.isInvoiceReady(),
-            Instant.now()));
+            persisted.getRatedAt()));
 
     return persisted;
   }
