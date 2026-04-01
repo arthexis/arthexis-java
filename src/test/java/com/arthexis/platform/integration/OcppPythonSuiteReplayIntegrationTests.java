@@ -98,7 +98,8 @@ class OcppPythonSuiteReplayIntegrationTests {
             noOpStateStore,
             new OcppCommandDispatchProperties(),
             objectMapper,
-            noOpEvents);
+            noOpEvents,
+            new OcppCommandTranslator());
 
     webSocketHandler =
         new OcppWebSocketHandler(

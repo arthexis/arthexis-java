@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,7 +44,7 @@ class OcppCommandDispatchServiceTests {
   }
 
   @Mock private OcppCommandRecordRepository commandRepository;
-  private OcppOutboundSessionRouter sessionRouter;
+  @Mock private OcppOutboundSessionRouter sessionRouter;
   private OcppSessionStateStore stateStore;
   @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -56,8 +57,6 @@ class OcppCommandDispatchServiceTests {
     properties.setRetryDelay(Duration.ofSeconds(1));
     properties.setMaxRetries(3);
 
-    sessionRouter = new OcppOutboundSessionRouter(new ObjectMapper());
-
     stateStore = new NoopStateStore();
 
     service =
@@ -67,7 +66,8 @@ class OcppCommandDispatchServiceTests {
             stateStore,
             properties,
             new ObjectMapper(),
-            eventPublisher);
+            eventPublisher,
+            new OcppCommandTranslator());
   }
 
   @Test
@@ -99,7 +99,8 @@ class OcppCommandDispatchServiceTests {
             stateStore,
             properties,
             new ObjectMapper(),
-            eventPublisher);
+            eventPublisher,
+            new OcppCommandTranslator());
 
     AdminCommandRequest request =
         new AdminCommandRequest("CP-77", "EVSE", "TriggerMessage", "new-profile", Map.of());
@@ -127,7 +128,8 @@ class OcppCommandDispatchServiceTests {
             stateStore,
             properties,
             new ObjectMapper(),
-            eventPublisher);
+            eventPublisher,
+            new OcppCommandTranslator());
 
     AdminCommandRequest defaultProfileRequest =
         new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));
@@ -212,11 +214,14 @@ class OcppCommandDispatchServiceTests {
   }
 
   @Test
-  void queuesCommandWhenSessionIsUnavailable() {
+  void queuesCommandWhenSessionIsUnavailable() throws Exception {
     AdminCommandRequest request =
         new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));
     when(commandRepository.save(any(OcppCommandRecord.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
+    doThrow(new java.io.IOException("station offline"))
+        .when(sessionRouter)
+        .sendToStation(eq("CP-16"), any(OcppMessage.class));
 
     service.submit(request, "admin");
 
@@ -237,7 +242,8 @@ class OcppCommandDispatchServiceTests {
             stateStore,
             properties,
             new ObjectMapper(),
-            eventPublisher);
+            eventPublisher,
+            new OcppCommandTranslator());
 
     AdminCommandRequest request =
         new AdminCommandRequest("CP-16", "EVSE", "Reset", "python-ocpp16", Map.of("type", "Soft"));
@@ -266,4 +272,50 @@ class OcppCommandDispatchServiceTests {
     assertThat(command.getFailureReason()).isEqualTo("Invalid command payload JSON");
     verify(commandRepository).save(command);
   }
+  @Test
+  void translatesCanonicalStartCommandForOcpp16BeforeDispatch() throws Exception {
+    AdminCommandRequest request =
+        new AdminCommandRequest(
+            "CP-16",
+            "EVSE",
+            "start",
+            "python-ocpp16",
+            Map.of("connector", 2, "token", "RFID-16"));
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isEqualTo(AdminCommandStatus.QUEUED);
+    ArgumentCaptor<OcppMessage> outbound = ArgumentCaptor.forClass(OcppMessage.class);
+    verify(sessionRouter).sendToStation(eq("CP-16"), outbound.capture());
+    assertThat(outbound.getValue().action()).isEqualTo("RemoteStartTransaction");
+    assertThat((Map<String, Object>) outbound.getValue().payload())
+        .containsEntry("connectorId", 2)
+        .containsEntry("idTag", "RFID-16");
+  }
+
+  @Test
+  void translatesCanonicalAvailabilityCommandForOcpp2xBeforeDispatch() throws Exception {
+    AdminCommandRequest request =
+        new AdminCommandRequest(
+            "CP-2X",
+            "EVSE",
+            "availability",
+            "python-ocpp2x",
+            Map.of("evseId", 3, "connector", 1, "type", "Inoperative"));
+    when(commandRepository.save(any(OcppCommandRecord.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var result = service.submit(request, "admin");
+
+    assertThat(result.status()).isEqualTo(AdminCommandStatus.QUEUED);
+    ArgumentCaptor<OcppMessage> outbound = ArgumentCaptor.forClass(OcppMessage.class);
+    verify(sessionRouter).sendToStation(eq("CP-2X"), outbound.capture());
+    assertThat(outbound.getValue().action()).isEqualTo("ChangeAvailability");
+    assertThat((Map<String, Object>) outbound.getValue().payload())
+        .containsEntry("operationalStatus", "Inoperative")
+        .containsEntry("evse", Map.of("id", 3, "connectorId", 1));
+  }
+
 }

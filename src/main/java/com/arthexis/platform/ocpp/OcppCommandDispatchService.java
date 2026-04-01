@@ -29,6 +29,7 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
   private final OcppCommandDispatchProperties properties;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final OcppCommandTranslator commandTranslator;
 
   public OcppCommandDispatchService(
       OcppCommandRecordRepository commandRepository,
@@ -36,13 +37,15 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
       OcppSessionStateStore stateStore,
       OcppCommandDispatchProperties properties,
       ObjectMapper objectMapper,
-      ApplicationEventPublisher eventPublisher) {
+      ApplicationEventPublisher eventPublisher,
+      OcppCommandTranslator commandTranslator) {
     this.commandRepository = commandRepository;
     this.sessionRouter = sessionRouter;
     this.stateStore = stateStore;
     this.properties = properties;
     this.objectMapper = objectMapper;
     this.eventPublisher = eventPublisher;
+    this.commandTranslator = commandTranslator;
   }
 
   @Override
@@ -55,16 +58,19 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
     String component = blank(request.component()) ? "CHARGE_POINT" : request.component().trim();
     String profile = blank(request.chargerProfile()) ? "python-ocpp16" : request.chargerProfile().trim();
 
-    if (!isSupportedForProfile(profile, request.action())) {
+    OcppCommandTranslator.TranslatedCommand translated =
+        commandTranslator.translate(profile, request.action(), request.payload());
+
+    if (!isSupportedForProfile(profile, translated.action())) {
       String message =
-          "Command action '%s' is not supported for charger profile '%s'"
-              .formatted(request.action(), profile);
+          "Translated command action '%s' is not supported for charger profile '%s'"
+              .formatted(translated.action(), profile);
       publish(
           new OcppCommandStatusChangedEvent(
               null,
               request.stationId(),
               component,
-              request.action(),
+              translated.action(),
               AdminCommandStatus.FAILED,
               null,
               message,
@@ -73,7 +79,7 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
           null,
           request.stationId(),
           component,
-          request.action(),
+          translated.action(),
           AdminCommandStatus.FAILED,
           message,
           Instant.now());
@@ -83,8 +89,8 @@ public class OcppCommandDispatchService implements AdminCommandGateway {
         new OcppCommandRecord(
             request.stationId().trim(),
             component,
-            request.action().trim(),
-            toJson(request.payload() == null ? Map.of() : request.payload()),
+            translated.action(),
+            toJson(translated.payload()),
             user,
             Math.max(1, properties.getMaxRetries() + 1));
 
