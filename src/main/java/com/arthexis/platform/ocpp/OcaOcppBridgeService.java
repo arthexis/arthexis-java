@@ -99,14 +99,6 @@ public class OcaOcppBridgeService {
         }
         yield response(stationId, accepted());
       }
-      case "Authorize" -> {
-        Map<String, Object> normalized = payloadNormalizer.normalizeAuthorize(stationId, payload);
-        String authorizationStatus =
-            normalized.containsKey("idTag") || normalized.containsKey("idToken")
-                ? "Accepted"
-                : "Invalid";
-        yield response(stationId, Map.of("idTagInfo", Map.of("status", authorizationStatus)));
-      }
       case "DiagnosticsStatusNotification" -> {
         chargingStationService.upsertStatus(stationId, "ONLINE", buildAdminDetails(payload, false));
         yield response(stationId, accepted());
