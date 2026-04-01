@@ -120,6 +120,62 @@ class OcaOcppPayloadNormalizerContractTests {
     assertNormalizationMatchesContract(normalized, expected);
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("startTransactionFixtures")
+  void keepsStartTransactionNormalizationContractBackwardCompatible(String fixtureFile)
+      throws IOException {
+    Map<String, Object> fixture = readFixture(fixtureFile);
+    Map<String, Object> payload = mapValue(fixture.get("payload"));
+    Map<String, Object> expected = mapValue(fixture.get("expected"));
+
+    String stationId = normalizer.resolveStationId(stringValue(fixture.get("sessionId")), payload);
+    Map<String, Object> normalized = normalizer.normalizeStartTransaction(stationId, payload);
+
+    assertNormalizationMatchesContract(normalized, expected);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("stopTransactionFixtures")
+  void keepsStopTransactionNormalizationContractBackwardCompatible(String fixtureFile)
+      throws IOException {
+    Map<String, Object> fixture = readFixture(fixtureFile);
+    Map<String, Object> payload = mapValue(fixture.get("payload"));
+    Map<String, Object> expected = mapValue(fixture.get("expected"));
+
+    String stationId = normalizer.resolveStationId(stringValue(fixture.get("sessionId")), payload);
+    Map<String, Object> normalized = normalizer.normalizeStopTransaction(stationId, payload);
+
+    assertNormalizationMatchesContract(normalized, expected);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("changeConfigurationFixtures")
+  void keepsChangeConfigurationNormalizationContractBackwardCompatible(String fixtureFile)
+      throws IOException {
+    Map<String, Object> fixture = readFixture(fixtureFile);
+    Map<String, Object> payload = mapValue(fixture.get("payload"));
+    Map<String, Object> expected = mapValue(fixture.get("expected"));
+
+    String stationId = normalizer.resolveStationId(stringValue(fixture.get("sessionId")), payload);
+    Map<String, Object> normalized = normalizer.normalizeChangeConfiguration(stationId, payload);
+
+    assertNormalizationMatchesContract(normalized, expected);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("getConfigurationFixtures")
+  void keepsGetConfigurationNormalizationContractBackwardCompatible(String fixtureFile)
+      throws IOException {
+    Map<String, Object> fixture = readFixture(fixtureFile);
+    Map<String, Object> payload = mapValue(fixture.get("payload"));
+    Map<String, Object> expected = mapValue(fixture.get("expected"));
+
+    String stationId = normalizer.resolveStationId(stringValue(fixture.get("sessionId")), payload);
+    Map<String, Object> normalized = normalizer.normalizeGetConfiguration(stationId, payload);
+
+    assertNormalizationMatchesContract(normalized, expected);
+  }
+
   private static Stream<Arguments> fixtureFiles() {
     return Stream.of(
             "boot_notification.ocpp16.json",
@@ -132,6 +188,10 @@ class OcaOcppPayloadNormalizerContractTests {
             "diagnostics_status.ocpp16.json",
             "firmware_status.ocpp2x.json",
             "availability_status.ocpp2x.json",
+            "start_transaction.ocpp16.json",
+            "stop_transaction.ocpp16.json",
+            "change_configuration.ocpp16.json",
+            "get_configuration.ocpp16.json",
             "meter_values.ocpp16.json",
             "meter_values.ocpp2x.json",
             "transaction_event.ocpp16.json",
@@ -162,6 +222,22 @@ class OcaOcppPayloadNormalizerContractTests {
 
   private static Stream<Arguments> availabilityFixtures() {
     return Stream.of("availability_status.ocpp2x.json").map(Arguments::of);
+  }
+
+  private static Stream<Arguments> startTransactionFixtures() {
+    return Stream.of("start_transaction.ocpp16.json").map(Arguments::of);
+  }
+
+  private static Stream<Arguments> stopTransactionFixtures() {
+    return Stream.of("stop_transaction.ocpp16.json").map(Arguments::of);
+  }
+
+  private static Stream<Arguments> changeConfigurationFixtures() {
+    return Stream.of("change_configuration.ocpp16.json").map(Arguments::of);
+  }
+
+  private static Stream<Arguments> getConfigurationFixtures() {
+    return Stream.of("get_configuration.ocpp16.json").map(Arguments::of);
   }
 
   private static void assertNormalizationMatchesContract(

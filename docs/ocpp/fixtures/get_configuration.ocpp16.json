@@ -1,0 +1,26 @@
+{
+  "name": "get_configuration_ocpp16_legacy",
+  "action": "GetConfiguration",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-get-config-16",
+  "payload": {
+    "stationId": "CP-16-CFG",
+    "key": [
+      "HeartbeatInterval",
+      "MeterValueSampleInterval"
+    ]
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-CFG",
+    "normalized": {
+      "stationId": "CP-16-CFG",
+      "key": [
+        "HeartbeatInterval",
+        "MeterValueSampleInterval"
+      ]
+    },
+    "types": {
+      "stationId": "string"
+    }
+  }
+}

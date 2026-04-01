@@ -12,6 +12,10 @@ Supported incoming actions:
 - `MeterValues`
 - `TransactionEvent`
 - `Authorize`
+- `StartTransaction`
+- `StopTransaction`
+- `ChangeConfiguration`
+- `GetConfiguration`
 - `DiagnosticsStatusNotification`
 - `FirmwareStatusNotification`
 - `AvailabilityStatusNotification`
@@ -95,6 +99,54 @@ Normalizer output contract for `Authorize`:
 - Includes `idToken` and/or `idTag` when present.
 - Includes `certificateStatus` when present.
 
+### StartTransaction
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; connector + token recommended | `stationId`, `connectorId`, `idTag`, `meterStart`, `timestamp`, `transactionId` | Normalizer extracts legacy transaction start fields for bridge status/state updates. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `connectorId`, `idTag`, `timestamp` | Treated as compatibility pathway for legacy test suites that still emit start semantics. |
+
+Normalizer output contract for start transaction:
+
+- Always includes `stationId`.
+- Includes numeric `connectorId` / `meterStart` when present.
+- Includes string `idTag`, `timestamp`, and `transactionId` when present.
+
+### StopTransaction
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; connector + transaction recommended | `stationId`, `connectorId`, `idTag`, `meterStop`, `timestamp`, `transactionId`, `reason` | Used for explicit end-of-session lifecycle parity with legacy clients. |
+| 2.x compatibility | none | `chargingStation.serialNumber`, `connectorId`, `transactionId`, `reason` | Compatibility mapping supported when stop event payloads are emitted in mixed environments. |
+
+Normalizer output contract for stop transaction:
+
+- Always includes `stationId`.
+- Includes numeric `connectorId` / `meterStop` when present.
+- Includes string `idTag`, `timestamp`, `transactionId`, and `reason` when present.
+
+### ChangeConfiguration
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; key/value recommended | `stationId`, `key`, `value` | Supported for production parity workflows where legacy clients post configuration updates. |
+
+Normalizer output contract for change configuration:
+
+- Always includes `stationId`.
+- Includes `key` and `value` as strings when present.
+
+### GetConfiguration
+
+| Variant | Required fields accepted | Optional fields accepted | Notes |
+|---|---|---|---|
+| 1.6J | none for parser entry; key list optional | `stationId`, `key[]` | Bridge response includes `configurationKey[]` and `unknownKey[]` placeholders for compatibility tests. |
+
+Normalizer output contract for get configuration:
+
+- Always includes `stationId`.
+- Includes `key` list when present.
+
 ### DiagnosticsStatusNotification
 
 | Variant | Required fields accepted | Optional fields accepted | Notes |
@@ -167,5 +219,9 @@ Included fixture files:
 - `diagnostics_status.ocpp16.json`
 - `firmware_status.ocpp2x.json`
 - `availability_status.ocpp2x.json`
+- `start_transaction.ocpp16.json`
+- `stop_transaction.ocpp16.json`
+- `change_configuration.ocpp16.json`
+- `get_configuration.ocpp16.json`
 
 These fixtures are the contract-test inputs for backward compatibility assertions in `OcaOcppPayloadNormalizerContractTests`.

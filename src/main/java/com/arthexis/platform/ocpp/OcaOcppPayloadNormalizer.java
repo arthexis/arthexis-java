@@ -141,6 +141,50 @@ public class OcaOcppPayloadNormalizer {
     return normalized;
   }
 
+  public Map<String, Object> normalizeStartTransaction(
+      String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    copyIfPresent(normalized, payload, "idTag");
+    copyIfPresent(normalized, payload, "transactionId");
+    copyIfPresent(normalized, payload, "timestamp");
+    copyNumericIfPresent(normalized, payload, "connectorId");
+    copyNumericIfPresent(normalized, payload, "meterStart");
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeStopTransaction(String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    copyIfPresent(normalized, payload, "idTag");
+    copyIfPresent(normalized, payload, "transactionId");
+    copyIfPresent(normalized, payload, "timestamp");
+    copyNumericIfPresent(normalized, payload, "connectorId");
+    copyNumericIfPresent(normalized, payload, "meterStop");
+    copyIfPresent(normalized, payload, "reason");
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeChangeConfiguration(
+      String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    copyIfPresent(normalized, payload, "key");
+    copyIfPresent(normalized, payload, "value");
+    return normalized;
+  }
+
+  public Map<String, Object> normalizeGetConfiguration(
+      String stationId, Map<String, Object> payload) {
+    Map<String, Object> normalized = new LinkedHashMap<>();
+    normalized.put("stationId", stationId);
+    Object keys = payload.get("key");
+    if (keys instanceof List<?> list) {
+      normalized.put("key", List.copyOf(list));
+    }
+    return normalized;
+  }
+
   private NormalizedSampleExtraction extractSampledValues(Map<String, Object> payload) {
     Map<String, Object> flattened = new LinkedHashMap<>();
     List<Map<String, Object>> structuredSamples = new ArrayList<>();
@@ -223,6 +267,27 @@ public class OcaOcppPayloadNormalizer {
     if (!value.isBlank()) {
       target.put(key, value);
     }
+  }
+
+  private void copyNumericIfPresent(Map<String, Object> target, Map<String, Object> source, String key) {
+    Integer value = parseInteger(source.get(key));
+    if (value != null) {
+      target.put(key, value);
+    }
+  }
+
+  private Integer parseInteger(Object rawValue) {
+    if (rawValue instanceof Number number) {
+      return number.intValue();
+    }
+    if (rawValue instanceof String text) {
+      try {
+        return Integer.parseInt(text);
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
   }
 
   private String resolveScopeType(String connectorId, String evseId, String transactionId) {

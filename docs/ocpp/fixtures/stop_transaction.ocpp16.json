@@ -1,0 +1,36 @@
+{
+  "name": "stop_transaction_ocpp16_legacy",
+  "action": "StopTransaction",
+  "ocppVariant": "1.6J",
+  "sessionId": "session-stop-16",
+  "payload": {
+    "stationId": "CP-16-STOP",
+    "connectorId": 2,
+    "idTag": "CARD-16",
+    "meterStop": 1150,
+    "timestamp": "2026-03-31T02:10:00Z",
+    "transactionId": 88,
+    "reason": "Local"
+  },
+  "expected": {
+    "resolvedStationId": "CP-16-STOP",
+    "normalized": {
+      "stationId": "CP-16-STOP",
+      "connectorId": 2,
+      "idTag": "CARD-16",
+      "meterStop": 1150,
+      "timestamp": "2026-03-31T02:10:00Z",
+      "transactionId": "88",
+      "reason": "Local"
+    },
+    "types": {
+      "stationId": "string",
+      "connectorId": "number",
+      "idTag": "string",
+      "meterStop": "number",
+      "timestamp": "string",
+      "transactionId": "string",
+      "reason": "string"
+    }
+  }
+}
